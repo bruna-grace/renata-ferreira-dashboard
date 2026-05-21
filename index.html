@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard de Performance Digital</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ─── Design tokens ─────────────────────────────────────── */
+    :root {
+      --bg:           #F4F6FB;
+      --surface:      #FFFFFF;
+      --surface-2:    #F1F4FA;
+      --border:       #E4E9F2;
+      --text-1:       #0D1526;
+      --text-2:       #4B5675;
+      --text-3:       #8E98B0;
+      --accent:       #4F46E5;
+      --accent-light: #EEF2FF;
+      --green:        #10B981;
+      --amber:        #F59E0B;
+      --red:          #EF4444;
+      --r:            16px;   /* border-radius card */
+      --r-sm:         10px;
+      --r-xs:         6px;
+      --shadow:       0 1px 4px rgba(13,21,38,.06), 0 2px 8px rgba(13,21,38,.04);
+      --shadow-md:    0 4px 16px rgba(13,21,38,.09), 0 2px 6px rgba(13,21,38,.05);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      min-height: 100vh;
+    }
+
+    /* ─── Header ────────────────────────────────────────────── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+      border-radius: var(--r-xs);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .brand-name  { font-size: 16px; font-weight: 700; letter-spacing: -.4px; }
+    .brand-sub   { font-size: 11px; color: var(--text-3); font-weight: 400; }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .update-info {
+      font-size: 12px;
+      color: var(--text-3);
+      text-align: right;
+    }
+
+    .update-info strong { color: var(--text-2); font-weight: 600; }
+
+    .badge-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      background: #DCFCE7;
+      color: #16A34A;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 99px;
+      letter-spacing: .3px;
+    }
+
+    .badge-live::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: #16A34A;
+      border-radius: 50%;
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 18px;
+      border: none;
+      border-radius: var(--r-xs);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .18s, transform .15s, box-shadow .18s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #4338CA;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(79,70,229,.4);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-primary:disabled {
+      opacity: .65;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .spin { animation: rotating .8s linear infinite; display: inline-block; }
+    @keyframes rotating { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+    /* ─── Layout ────────────────────────────────────────────── */
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+
+    /* ─── Section label ─────────────────────────────────────── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 16px;
+    }
+
+    /* ─── KPI grid ──────────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 22px 22px 18px;
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow .2s, transform .2s;
+    }
+
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--c, var(--accent));
+      border-radius: var(--r) var(--r) 0 0;
+    }
+
+    .kpi-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .kpi-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    .kpi-ico {
+      width: 34px; height: 34px;
+      border-radius: var(--r-xs);
+      background: var(--bg-ico, var(--accent-light));
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+    }
+
+    .kpi-val {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1;
+      margin-bottom: 7px;
+    }
+
+    .kpi-foot {
+      font-size: 11.5px;
+      color: var(--text-3);
+    }
+
+    .pos { color: var(--green);  font-weight: 600; }
+    .neg { color: var(--red);    font-weight: 600; }
+    .neu { color: var(--text-2); font-weight: 500; }
+
+    /* ─── Chart cards ───────────────────────────────────────── */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 26px 26px 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+    .chart-sub   { font-size: 12px; color: var(--text-3); margin-bottom: 22px; }
+
+    .canvas-wrap         { position: relative; height: 300px; }
+    .canvas-wrap-lg      { position: relative; height: 340px; }
+    .canvas-wrap-donut   { position: relative; height: 280px; }
+
+    .mb-20 { margin-bottom: 20px; }
+    .mb-28 { margin-bottom: 28px; }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .row-2-1 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    /* ─── Insights ──────────────────────────────────────────── */
+    .insights-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 26px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .insights-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .insights-ico {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg,#4F46E5,#7C3AED);
+      border-radius: var(--r-xs);
+      display: grid;
+      place-items: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+
+    .insights-hd-text .t1 { font-size: 14px; font-weight: 700; }
+    .insights-hd-text .t2 { font-size: 11px; color: var(--text-3); }
+
+    .insights-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; }
+
+    .iitem {
+      display: flex;
+      gap: 11px;
+      padding: 13px 14px;
+      background: var(--surface-2);
+      border-radius: var(--r-sm);
+      border-left: 3px solid var(--accent);
+    }
+
+    .iitem.ok   { border-left-color: var(--green); }
+    .iitem.warn { border-left-color: var(--amber); }
+    .iitem.bad  { border-left-color: var(--red);   }
+
+    .iico { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+
+    .ititle { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--text-3); margin-bottom: 3px; }
+    .itext  { font-size: 12.5px; color: var(--text-2); line-height: 1.55; }
+
+    /* ─── Loading / Error ───────────────────────────────────── */
+    .center-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 420px;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .loader {
+      width: 42px; height: 42px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: rotating .75s linear infinite;
+    }
+
+    .state-title { font-size: 16px; font-weight: 600; }
+    .state-sub   { font-size: 13px; color: var(--text-3); max-width: 420px; }
+
+    /* ─── Responsive ────────────────────────────────────────── */
+    @media (max-width: 1100px) {
+      .row-2, .row-2-1 { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .topbar { padding: 0 16px; height: auto; min-height: 56px; flex-wrap: wrap; gap: 10px; padding-top: 10px; padding-bottom: 10px; }
+      .page   { padding: 20px 14px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .update-info { display: none; }
+      .canvas-wrap-lg { height: 260px; }
+    }
+
+    @media (max-width: 480px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ─── Divider ───────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin: 8px 0 28px; }
+  </style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════╗
+     ║  TOPBAR                                      ║
+     ╚══════════════════════════════════════════════╝ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">📊</div>
+    <div>
+      <div class="brand-name">Performance Digital</div>
+      <div class="brand-sub">Redes Sociais &amp; Google Ads</div>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+    <div class="update-info">
+      Última atualização<br>
+      <strong id="lastUpdate">—</strong>
+    </div>
+    <span class="badge-live">Ao vivo</span>
+    <button class="btn btn-primary" id="btnRefresh" onclick="loadAll()">
+      <span id="refreshIcon">↻</span> Atualizar dados
+    </button>
+  </div>
+</header>
+
+<!-- ╔══════════════════════════════════════════════╗
+     ║  MAIN                                        ║
+     ╚══════════════════════════════════════════════╝ -->
+<main class="page">
+
+  <!-- Loading -->
+  <div id="stateLoading" class="center-state">
+    <div class="loader"></div>
+    <div class="state-title">Carregando dados…</div>
+    <div class="state-sub">Buscando informações dos canais. Aguarde um instante.</div>
+  </div>
+
+  <!-- Error -->
+  <div id="stateError" class="center-state" style="display:none">
+    <div style="font-size:44px">⚠️</div>
+    <div class="state-title">Não foi possível carregar os dados</div>
+    <div class="state-sub" id="errMsg">Verifique os links dos CSVs e se a planilha está publicada na web.</div>
+    <button class="btn btn-primary" style="margin-top:8px" onclick="loadAll()">↻ Tentar novamente</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dash" style="display:none">
+
+    <!-- ── KPIs ── -->
+    <div class="section-label">📌 Indicadores Principais</div>
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="divider"></div>
+
+    <!-- ── Gráfico 1: crescimento (linha) ── -->
+    <div class="section-label">📈 Histórico de Crescimento</div>
+    <div class="chart-card mb-28">
+      <div class="chart-title">Crescimento de Seguidores / Inscritos por Canal</div>
+      <div class="chart-sub">Evolução histórica ao longo do período selecionado</div>
+      <div class="canvas-wrap-lg"><canvas id="cGrowth"></canvas></div>
+    </div>
+
+    <!-- ── Gráficos 2 e 3: impressões + CTR ── -->
+    <div class="section-label">📊 Visibilidade &amp; Engajamento</div>
+    <div class="row-2">
+      <div class="chart-card">
+        <div class="chart-title">Impressões por Canal</div>
+        <div class="chart-sub">Total acumulado no período</div>
+        <div class="canvas-wrap"><canvas id="cImpressions"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">CTR por Canal</div>
+        <div class="chart-sub">Taxa média de cliques (%)</div>
+        <div class="canvas-wrap"><canvas id="cCTR"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── Gráfico 4: alcance (rosca) + Insights ── -->
+    <div class="section-label">🎯 Alcance &amp; Análise</div>
+    <div class="row-2-1">
+      <div class="chart-card">
+        <div class="chart-title">Alcance por Canal</div>
+        <div class="chart-sub">Distribuição do alcance total entre os canais</div>
+        <div class="canvas-wrap-donut"><canvas id="cReach"></canvas></div>
+      </div>
+
+      <div class="insights-card">
+        <div class="insights-head">
+          <div class="insights-ico">💡</div>
+          <div class="insights-hd-text">
+            <div class="t1">Análise Automática</div>
+            <div class="t2">Insights gerados a partir dos seus dados reais</div>
+          </div>
+        </div>
+        <div class="insights-list" id="insightsList"></div>
+      </div>
+    </div>
+
+  </div><!-- /#dash -->
+</main>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  JAVASCRIPT                                                  ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+<script>
+/* ================================================================
+   ⚙️  CONFIGURAÇÃO — EDITE AQUI E SOMENTE AQUI
+   ================================================================
+   Técnica: Google Visualization API (gviz/tq) com JSONP nativo.
+   Carrega via <script> tag — zero CORS, funciona de file://,
+   Google Sites, localhost ou qualquer origem.
+
+   Pré-requisito: planilha compartilhada como
+   "Qualquer pessoa com o link pode visualizar".
+
+   • SHEET_ID  : ID da planilha (entre /d/ e /edit na URL)
+   • sheetName : nome EXATO da aba (maiúsculas importam)
+   ================================================================ */
+
+/* ── ID DA PLANILHA ─────────────────────────────────────────── */
+const SHEET_ID = '1RuTUcnxjWmAkXYtCQSLRX3pLdLo6H1qsTskGdQTrTeU';
+
+/* ── CANAIS ──────────────────────────────────────────────────── */
+const CHANNELS = [
+  {
+    id:        'instagram',
+    name:      'Instagram',
+    label:     'Seguidores',
+    color:     '#E1306C',
+    bgIco:     '#FFF0F5',
+    icon:      '📸',
+    sheetName: 'instagram',   // 👈 nome exato da aba
+  },
+  {
+    id:        'facebook',
+    name:      'Facebook',
+    label:     'Seguidores',
+    color:     '#1877F2',
+    bgIco:     '#EFF6FF',
+    icon:      '👍',
+    sheetName: 'facebook',
+  },
+  {
+    id:        'gsc',
+    name:      'Google Search',
+    label:     'Cliques',
+    color:     '#34A853',
+    bgIco:     '#F0FFF4',
+    icon:      '🔍',
+    sheetName: 'GSC',
+  },
+  {
+    id:        'youtube',
+    name:      'YouTube',
+    label:     'Inscritos',
+    color:     '#FF0000',
+    bgIco:     '#FFF5F5',
+    icon:      '▶️',
+    sheetName: 'YouTube',
+  },
+  {
+    id:        'google_ads',
+    name:      'Google ADS',
+    label:     'Cliques',
+    color:     '#4285F4',
+    bgIco:     '#EEF2FF',
+    icon:      '🎯',
+    sheetName: 'Google ADS',
+  },
+];
+
+/* ── ALIASES DE COLUNAS — adicione variações se necessário ───── */
+const ALIASES = {
+  date:        ['data','date','mes','mes_ano','periodo','period','week','semana','month','dia','competencia'],
+  followers:   ['seguidores','followers','inscritos','subscribers','assinantes','fans','seguidores_total','total_seguidores','cliques_totais','cliques'],
+  reach:       ['alcance','reach','alcance_total','total_reach','pessoas_alcancadas','unique_reach','alcance_organico'],
+  impressions: ['impressoes','impressions','views','visualizacoes','exibicoes','total_impressoes','total_impressions','impressao'],
+  ctr:         ['ctr','taxa_de_cliques','click_through_rate','taxa_clique','ctr_percent','ctr_%','taxa_ctr'],
+  clicks:      ['cliques','clicks','link_clicks','cliques_link','total_cliques','cliques_no_link'],
+  investment:  ['investimento','investment','valor','gasto','spend','custo','cost','budget','orcamento','total_gasto','valor_investido'],
+  conversions: ['conversoes','conversions','resultados','leads','vendas','sales','total_conversoes'],
+};
+
+/* ================================================================
+   FIM DA CONFIGURAÇÃO
+   ================================================================ */
+
+
+/* ── Helpers de parsing ─────────────────────────────────────── */
+
+function norm(s) {
+  return String(s).trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[\s\-\/\\]+/g,'_')
+    .replace(/[^a-z0-9_]/g,'')
+    .replace(/_+/g,'_').replace(/^_|_$/g,'');
+}
+
+function toNum(v) {
+  if (v===null||v===undefined||v==='') return null;
+  if (typeof v==='number') return isNaN(v)?null:v;
+  const s = String(v).trim()
+    .replace(/[R$\s%€]/g,'')
+    .replace(/\.(?=\d{3})/g,'')
+    .replace(',','.');
+  const n = parseFloat(s);
+  return isNaN(n)?null:n;
+}
+
+function toDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime())?null:v;
+  const s = String(v).trim();
+  const tries = [
+    s,
+    s.replace(/^(\d{2})\/(\d{2})\/(\d{4})$/,'$3-$2-$1'),
+    s.replace(/^(\d{2})-(\d{2})-(\d{4})$/,'$3-$2-$1'),
+    s+'-01',
+  ];
+  for (const t of tries) {
+    const d = new Date(t);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function findCol(headers, aliases) {
+  for (const a of aliases) {
+    const n = norm(a);
+    if (headers.includes(n)) return n;
+  }
+  for (const a of aliases) {
+    const n = norm(a);
+    const found = headers.find(h => h.includes(n)||n.includes(h));
+    if (found) return found;
+  }
+  return null;
+}
+
+/* Converte resposta gviz/tq → { heads, rows } com tipos já convertidos */
+function parseGviz(data) {
+  const table = data.table;
+  if (!table || !table.cols) throw new Error('Resposta gviz sem tabela');
+
+  const heads = table.cols.map(c => norm(c.label || c.id || ''));
+  const types = table.cols.map(c => c.type || 'string');
+
+  const rows = (table.rows || []).map(r => {
+    const row = {};
+    (r.c || []).forEach((cell, i) => {
+      if (!cell || cell.v === null || cell.v === undefined) {
+        row[heads[i]] = null; return;
+      }
+      if (types[i] === 'date' || types[i] === 'datetime') {
+        /* gviz codifica datas como "Date(2024,0,15)" em JSON */
+        const m = String(cell.v).match(/Date\((\d+),(\d+),(\d+)/);
+        row[heads[i]] = m ? new Date(+m[1], +m[2], +m[3]) : toDate(String(cell.v));
+      } else if (types[i] === 'number') {
+        row[heads[i]] = typeof cell.v === 'number' ? cell.v : toNum(cell.v);
+      } else {
+        row[heads[i]] = String(cell.v);
+      }
+    });
+    return row;
+  }).filter(r => Object.values(r).some(v => v !== null && v !== '' && v !== undefined));
+
+  return { heads, rows };
+}
+
+function processChannel(parsed, cfg) {
+  const h = parsed.heads;
+  const cols = {};
+  for (const [k, aliases] of Object.entries(ALIASES)) cols[k] = findCol(h, aliases);
+
+  let rows = parsed.rows.map(r => ({
+    date:        cols.date        ? toDate(r[cols.date])        : null,
+    followers:   cols.followers   ? toNum(r[cols.followers])    : null,
+    reach:       cols.reach       ? toNum(r[cols.reach])        : null,
+    impressions: cols.impressions ? toNum(r[cols.impressions])  : null,
+    ctr:         cols.ctr         ? toNum(r[cols.ctr])          : null,
+    clicks:      cols.clicks      ? toNum(r[cols.clicks])       : null,
+    investment:  cols.investment  ? toNum(r[cols.investment])   : null,
+    conversions: cols.conversions ? toNum(r[cols.conversions])  : null,
+  })).filter(r =>
+    r.followers!==null || r.reach!==null ||
+    r.impressions!==null || r.clicks!==null
+  );
+
+  // ordena por data se disponível
+  if (cols.date) rows.sort((a,b) => (!a.date?1:!b.date?-1:a.date-b.date));
+
+  const sum = (key) => rows.reduce((s,r) => s + (r[key]||0), 0);
+  const totals = {
+    reach:       sum('reach'),
+    impressions: sum('impressions'),
+    investment:  sum('investment'),
+    clicks:      sum('clicks'),
+    conversions: sum('conversions'),
+  };
+
+  const ctrVals = rows.filter(r=>r.ctr!==null).map(r=>r.ctr);
+  const avgCTR  = ctrVals.length
+    ? ctrVals.reduce((a,b)=>a+b,0)/ctrVals.length
+    : (totals.clicks && totals.impressions
+        ? (totals.clicks/totals.impressions)*100 : null);
+
+  const firstF = rows.find(r=>r.followers!==null);
+  const lastF  = [...rows].reverse().find(r=>r.followers!==null);
+  const latest = rows[rows.length-1] || {};
+
+  const growthAbs = (firstF && lastF && firstF!==lastF) ? lastF.followers - firstF.followers : null;
+  const growthPct = (growthAbs!==null && firstF?.followers>0)
+    ? (growthAbs/firstF.followers)*100 : null;
+
+  return { cfg, cols, rows, latest, totals, avgCTR,
+           latestFollowers: latest.followers ?? null,
+           growthAbs, growthPct };
+}
+
+
+/* ── Google gviz/tq JSONP — funciona de file://, Google Sites, qualquer origem ── */
+function fetchSheet(sheetName) {
+  return new Promise((resolve, reject) => {
+    /* nome único e válido como identificador JS */
+    const cb = 'gvizCb' + Date.now() + Math.floor(Math.random() * 99999);
+
+    const timer = setTimeout(() => {
+      delete window[cb];
+      document.getElementById(cb)?.remove();
+      reject(new Error(
+        '"' + sheetName + '" não respondeu em 15s.\n' +
+        'Confirme: planilha compartilhada como "Qualquer pessoa com o link pode ver".'
+      ));
+    }, 15000);
+
+    window[cb] = function(data) {
+      clearTimeout(timer);
+      delete window[cb];
+      document.getElementById(cb)?.remove();
+
+      if (!data || data.status === 'error') {
+        const msg = data?.errors?.[0]?.detailed_message
+                 || data?.errors?.[0]?.message
+                 || 'Erro na aba "' + sheetName + '".';
+        reject(new Error(msg)); return;
+      }
+      try { resolve(parseGviz(data)); }
+      catch(e) { reject(e); }
+    };
+
+    const script = document.createElement('script');
+    script.id  = cb;
+    script.src = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+                 '/gviz/tq?tqx=out:json;responseHandler:' + cb +
+                 '&sheet=' + encodeURIComponent(sheetName) +
+                 '&_nc=' + Date.now();
+    script.onerror = () => {
+      clearTimeout(timer);
+      delete window[cb];
+      script.remove();
+      reject(new Error(
+        'Falha ao acessar "' + sheetName + '".\n' +
+        'Confirme: planilha compartilhada como "Qualquer pessoa com o link pode ver".'
+      ));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+
+/* ── Estado global ──────────────────────────────────────────── */
+let DATA = {};
+let CHARTS = {};
+
+
+/* ── Formatters ─────────────────────────────────────────────── */
+const fmtN   = (n,d=0) => n==null||isNaN(n) ? '—' : n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtBRL = (n)     => n==null||isNaN(n) ? '—' : n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtPct = (n,d=1) => n==null||isNaN(n) ? '—' : n.toFixed(d)+'%';
+const fmtK   = (n)     => {
+  if (n==null||isNaN(n)) return '—';
+  if (n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if (n>=1e3) return (n/1e3).toFixed(1)+'K';
+  return fmtN(n);
+};
+
+
+/* ── UI state ───────────────────────────────────────────────── */
+function showLoading() {
+  document.getElementById('stateLoading').style.display='flex';
+  document.getElementById('stateError').style.display='none';
+  document.getElementById('dash').style.display='none';
+  const btn=document.getElementById('btnRefresh');
+  btn.disabled=true;
+  document.getElementById('refreshIcon').className='spin';
+}
+
+function showDash() {
+  document.getElementById('stateLoading').style.display='none';
+  document.getElementById('stateError').style.display='none';
+  document.getElementById('dash').style.display='block';
+  const btn=document.getElementById('btnRefresh');
+  btn.disabled=false;
+  document.getElementById('refreshIcon').className='';
+}
+
+function showError(msg) {
+  document.getElementById('stateLoading').style.display='none';
+  document.getElementById('stateError').style.display='flex';
+  document.getElementById('dash').style.display='none';
+  document.getElementById('btnRefresh').disabled=false;
+  document.getElementById('refreshIcon').className='';
+
+  document.getElementById('errMsg').textContent = msg;
+}
+
+
+/* ── MAIN LOADER ────────────────────────────────────────────── */
+async function loadAll() {
+  showLoading();
+  DATA = {};
+
+
+  const results = await Promise.allSettled(
+    CHANNELS.map(async c => {
+      const parsed = await fetchSheet(c.sheetName);
+      return { id: c.id, data: processChannel(parsed, c) };
+    })
+  );
+
+  const errors = [];
+  results.forEach((res, i) => {
+    if (res.status === 'fulfilled') {
+      DATA[res.value.id] = res.value.data;
+    } else {
+      errors.push(`${CHANNELS[i].name}: ${res.reason?.message||'erro'}`);
+      console.warn('Erro ao carregar canal:', res.reason);
+    }
+  });
+
+  if (!Object.keys(DATA).length) {
+    showError(
+      'Nenhum canal carregou. Verifique:\n' +
+      '• A planilha está publicada na web (Arquivo → Compartilhar → Publicar na web)\n' +
+      '• Os nomes das abas estão corretos no código\n\n' +
+      errors.join('\n')
+    );
+    return;
+  }
+
+  renderKPIs();
+  renderCharts();
+  renderInsights();
+  document.getElementById('lastUpdate').textContent =
+    new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  showDash();
+}
+
+
+/* ── KPI Cards ──────────────────────────────────────────────── */
+function renderKPIs() {
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
+
+  /* --- Cards por canal --- */
+  Object.values(DATA).forEach(ch => {
+    const v    = ch.latestFollowers;
+    const gpct = ch.growthPct;
+    let growthHtml = '';
+    if (gpct!==null) {
+      const cls  = gpct>=0 ? 'pos' : 'neg';
+      const sign = gpct>=0 ? '+' : '';
+      growthHtml = `<span class="${cls}">${sign}${fmtPct(gpct)}</span> no período`;
+    }
+
+    grid.innerHTML += `
+      <div class="kpi-card" style="--c:${ch.cfg.color}">
+        <div class="kpi-top">
+          <span class="kpi-label">${ch.cfg.name}</span>
+          <div class="kpi-ico" style="--bg-ico:${ch.cfg.bgIco};background:${ch.cfg.bgIco}">${ch.cfg.icon}</div>
+        </div>
+        <div class="kpi-val">${fmtK(v)}</div>
+        <div class="kpi-foot">${ch.cfg.label}${growthHtml ? ' &middot; '+growthHtml : ''}</div>
+      </div>`;
+  });
+
+  /* --- Investimento total --- */
+  const totalInv = Object.values(DATA).reduce((s,c)=>s+c.totals.investment,0);
+  if (totalInv > 0) {
+    grid.innerHTML += `
+      <div class="kpi-card" style="--c:#10B981">
+        <div class="kpi-top">
+          <span class="kpi-label">Investimento ADS</span>
+          <div class="kpi-ico" style="background:#ECFDF5">💰</div>
+        </div>
+        <div class="kpi-val" style="font-size:22px">${fmtBRL(totalInv)}</div>
+        <div class="kpi-foot">Total investido no período</div>
+      </div>`;
+  }
+
+  /* --- CTR médio geral --- */
+  const ctrs = Object.values(DATA).filter(c=>c.avgCTR!==null).map(c=>c.avgCTR);
+  if (ctrs.length) {
+    const avg = ctrs.reduce((a,b)=>a+b,0)/ctrs.length;
+    grid.innerHTML += `
+      <div class="kpi-card" style="--c:#7C3AED">
+        <div class="kpi-top">
+          <span class="kpi-label">CTR Médio Geral</span>
+          <div class="kpi-ico" style="background:#F5F3FF">🎯</div>
+        </div>
+        <div class="kpi-val">${fmtPct(avg)}</div>
+        <div class="kpi-foot">Taxa de cliques média — todos os canais</div>
+      </div>`;
+  }
+}
+
+
+/* ── Helpers Chart.js ───────────────────────────────────────── */
+function rgba(hex, a) {
+  const [r,g,b] = [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+const FONT = { family:"'Inter', sans-serif" };
+const TOOLTIP_BASE = {
+  backgroundColor:'#0D1526',
+  titleFont:{...FONT,size:12,weight:'600'},
+  bodyFont:{...FONT,size:11},
+  padding:12, cornerRadius:8, caretSize:4,
+};
+const TICK = { font:{...FONT,size:11}, color:'#8E98B0' };
+const GRID_Y = { color:'#EDF0F7', drawBorder:false };
+
+function killChart(id) {
+  if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; }
+}
+
+function renderCharts() {
+  renderGrowth();
+  renderImpressions();
+  renderCTR();
+  renderReach();
+}
+
+
+/* ── 1. Linha — crescimento ─────────────────────────────────── */
+function renderGrowth() {
+  killChart('g');
+
+  const allDates = new Set();
+  Object.values(DATA).forEach(ch =>
+    ch.rows.forEach(r => { if(r.date) allDates.add(r.date.toISOString().slice(0,10)); })
+  );
+  const dates = [...allDates].sort();
+  const hasDates = dates.length > 0;
+
+  const datasets = Object.values(DATA)
+    .filter(ch => ch.rows.some(r=>r.followers!==null))
+    .map(ch => {
+      let d;
+      if (hasDates) {
+        const map = {};
+        ch.rows.forEach(r => { if(r.date&&r.followers!==null) map[r.date.toISOString().slice(0,10)]=r.followers; });
+        d = dates.map(dt => map[dt]??null);
+      } else {
+        d = ch.rows.filter(r=>r.followers!==null).map(r=>r.followers);
+      }
+      return {
+        label: ch.cfg.name, data: d,
+        borderColor: ch.cfg.color,
+        backgroundColor: rgba(ch.cfg.color, .07),
+        fill: true, tension: .4,
+        borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6,
+        pointBackgroundColor: ch.cfg.color,
+      };
+    });
+
+  if (!datasets.length) return;
+
+  const labels = hasDates
+    ? dates.map(d => new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{month:'short',day:'numeric'}))
+    : datasets[0].data.map((_,i)=>`Período ${i+1}`);
+
+  CHARTS.g = new Chart(document.getElementById('cGrowth').getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ position:'bottom', labels:{...FONT,usePointStyle:true,pointStyle:'circle',padding:16,font:{...FONT,size:11}} },
+        tooltip:{ ...TOOLTIP_BASE, callbacks:{ label: c=>` ${c.dataset.label}: ${fmtN(c.raw)}` } },
+      },
+      scales:{
+        x:{ grid:{display:false}, border:{display:false}, ticks:TICK },
+        y:{ grid:GRID_Y, border:{display:false}, ticks:{...TICK, callback:v=>fmtK(v)} },
+      },
+    },
+  });
+}
+
+
+/* ── 2. Barras — impressões ─────────────────────────────────── */
+function renderImpressions() {
+  killChart('i');
+  const chs = Object.values(DATA).filter(c=>c.totals.impressions>0);
+  if (!chs.length) return;
+
+  CHARTS.i = new Chart(document.getElementById('cImpressions').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: chs.map(c=>c.cfg.name),
+      datasets:[{
+        label:'Impressões',
+        data: chs.map(c=>c.totals.impressions),
+        backgroundColor: chs.map(c=>rgba(c.cfg.color,.82)),
+        borderWidth:0, borderRadius:8, borderSkipped:false,
+      }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{ ...TOOLTIP_BASE, callbacks:{ label:c=>` ${fmtK(c.raw)} impressões` } },
+      },
+      scales:{
+        x:{ grid:{display:false}, border:{display:false}, ticks:TICK },
+        y:{ grid:GRID_Y, border:{display:false}, ticks:{...TICK, callback:v=>fmtK(v)} },
+      },
+    },
+  });
+}
+
+
+/* ── 3. Barras — CTR ────────────────────────────────────────── */
+function renderCTR() {
+  killChart('c');
+  const chs = Object.values(DATA).filter(c=>c.avgCTR!==null);
+  if (!chs.length) return;
+
+  CHARTS.c = new Chart(document.getElementById('cCTR').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: chs.map(c=>c.cfg.name),
+      datasets:[{
+        label:'CTR (%)',
+        data: chs.map(c=>c.avgCTR),
+        backgroundColor: chs.map(c=>rgba(c.cfg.color,.82)),
+        borderWidth:0, borderRadius:8, borderSkipped:false,
+      }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{ ...TOOLTIP_BASE, callbacks:{ label:c=>` CTR: ${fmtPct(c.raw)}` } },
+      },
+      scales:{
+        x:{ grid:{display:false}, border:{display:false}, ticks:TICK },
+        y:{ grid:GRID_Y, border:{display:false}, ticks:{...TICK, callback:v=>v.toFixed(1)+'%'} },
+      },
+    },
+  });
+}
+
+
+/* ── 4. Rosca — alcance ─────────────────────────────────────── */
+function renderReach() {
+  killChart('r');
+  const chs = Object.values(DATA).filter(c=>c.totals.reach>0);
+  if (!chs.length) return;
+
+  CHARTS.r = new Chart(document.getElementById('cReach').getContext('2d'), {
+    type:'doughnut',
+    data:{
+      labels: chs.map(c=>c.cfg.name),
+      datasets:[{
+        data: chs.map(c=>c.totals.reach),
+        backgroundColor: chs.map(c=>rgba(c.cfg.color,.88)),
+        borderColor: chs.map(c=>c.cfg.color),
+        borderWidth:2, hoverOffset:8,
+      }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'64%',
+      plugins:{
+        legend:{ position:'bottom', labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{...FONT,size:11}} },
+        tooltip:{
+          ...TOOLTIP_BASE,
+          callbacks:{
+            label: c => {
+              const total = c.dataset.data.reduce((a,b)=>a+b,0);
+              return ` ${fmtK(c.raw)} (${((c.raw/total)*100).toFixed(1)}%)`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+
+/* ── Insights automáticos ───────────────────────────────────── */
+function renderInsights() {
+  const list = document.getElementById('insightsList');
+  list.innerHTML = '';
+  const chs = Object.values(DATA);
+  if (!chs.length) return;
+
+  const ins = [];
+
+  /* canal com maior alcance */
+  const byReach = chs.filter(c=>c.totals.reach>0).sort((a,b)=>b.totals.reach-a.totals.reach);
+  if (byReach.length) {
+    const top   = byReach[0];
+    const total = byReach.reduce((s,c)=>s+c.totals.reach,0);
+    const pct   = total>0 ? ((top.totals.reach/total)*100).toFixed(0)+'%' : '';
+    ins.push({ cls:'ok', ico:'🏆', t:'Maior Alcance',
+      txt:`${top.cfg.name} lidera com ${fmtK(top.totals.reach)} pessoas alcançadas${pct?' — '+pct+' do alcance total':''}.` });
+  }
+
+  /* canal com maior crescimento */
+  const byGrowth = chs.filter(c=>c.growthPct!==null).sort((a,b)=>b.growthPct-a.growthPct);
+  if (byGrowth.length) {
+    const top = byGrowth[0];
+    if (top.growthPct > 0) {
+      ins.push({ cls:'ok', ico:'📈', t:'Maior Crescimento',
+        txt:`${top.cfg.name} cresceu ${fmtPct(top.growthPct)} no período (+${fmtK(top.growthAbs)} ${top.cfg.label.toLowerCase()}).` });
+    } else if (top.growthPct < 0) {
+      ins.push({ cls:'bad', ico:'📉', t:'Crescimento Negativo',
+        txt:`${top.cfg.name} registrou queda de ${fmtPct(Math.abs(top.growthPct))}. Considere revisar a estratégia de conteúdo.` });
+    }
+  }
+
+  /* CTR destaque */
+  const byCTR = chs.filter(c=>c.avgCTR!==null).sort((a,b)=>b.avgCTR-a.avgCTR);
+  if (byCTR.length) {
+    const top = byCTR[0];
+    const cls = top.avgCTR>=3?'ok':top.avgCTR>=1?'warn':'bad';
+    const comment = top.avgCTR>=3
+      ? 'excelente — acima da média do mercado'
+      : top.avgCTR>=1 ? 'dentro da média do mercado'
+      : 'abaixo da média — revise os criativos e segmentação';
+    ins.push({ cls, ico:'🎯', t:'CTR em Destaque',
+      txt:`${top.cfg.name} registrou CTR de ${fmtPct(top.avgCTR)}: ${comment}.` });
+  }
+
+  /* investimento e conversão / custo por clique */
+  const totalInv  = chs.reduce((s,c)=>s+c.totals.investment,0);
+  const totalConv = chs.reduce((s,c)=>s+c.totals.conversions,0);
+  const totalClk  = chs.reduce((s,c)=>s+c.totals.clicks,0);
+  if (totalInv > 0 && totalConv > 0) {
+    ins.push({ cls:'warn', ico:'💰', t:'Custo por Conversão',
+      txt:`${fmtBRL(totalInv)} investidos geraram ${fmtN(totalConv)} conversões — custo por resultado: ${fmtBRL(totalInv/totalConv)}.` });
+  } else if (totalInv > 0 && totalClk > 0) {
+    ins.push({ cls:'warn', ico:'💰', t:'Custo por Clique',
+      txt:`Investimento de ${fmtBRL(totalInv)} gerou ${fmtK(totalClk)} cliques — CPC médio de ${fmtBRL(totalInv/totalClk)}.` });
+  }
+
+  /* resumo geral */
+  const totalFol = chs.reduce((s,c)=>s+(c.latestFollowers||0),0);
+  const totalImp = chs.reduce((s,c)=>s+c.totals.impressions,0);
+  ins.push({ cls:'', ico:'📊', t:'Resumo do Período',
+    txt:`Audiência total de ${fmtK(totalFol)} pessoas em ${chs.length} canais monitorados${totalImp>0?', com '+fmtK(totalImp)+' impressões acumuladas':''}.` });
+
+  ins.forEach(it => {
+    list.innerHTML += `
+      <div class="iitem ${it.cls}">
+        <div class="iico">${it.ico}</div>
+        <div>
+          <div class="ititle">${it.t}</div>
+          <div class="itext">${it.txt}</div>
+        </div>
+      </div>`;
+  });
+}
+
+
+/* ── Boot ───────────────────────────────────────────────────── */
+loadAll();
+</script>
+</body>
+</html>
