@@ -688,6 +688,7 @@ function fetchSheet(sheetName) {
     script.src = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
                  '/gviz/tq?tqx=out:json;responseHandler:' + cb +
                  '&sheet=' + encodeURIComponent(sheetName) +
+                 '&headers=1' +
                  '&_nc=' + Date.now();
     script.onerror = () => {
       clearTimeout(timer);
