@@ -328,6 +328,51 @@
 
     /* ─── Divider ───────────────────────────────────────────── */
     .divider { height: 1px; background: var(--border); margin: 4px 0 24px; }
+
+    /* ─── Light mode token overrides ───────────────────────── */
+    body.light {
+      --bg:        #ffffff;
+      --surface:   #ffffff;
+      --surface-2: #f4f4f5;
+      --border:    #e4e4e7;
+      --text-1:    #09090b;
+      --text-2:    #52525b;
+      --text-3:    #a1a1aa;
+      --accent:    #09090b;
+      --accent-fg: #fafafa;
+      --shadow:    0 1px 3px rgba(0,0,0,.08);
+      --shadow-md: 0 8px 30px rgba(0,0,0,.12);
+    }
+
+    body.light .btn-primary:hover  { background: #18181b; border-color: #18181b; }
+    body.light .btn-primary:active { background: #3f3f46; border-color: #3f3f46; }
+    body.light .kpi-card:hover     { border-color: #d4d4d8; }
+
+    /* ─── Theme toggle button ───────────────────────────────── */
+    .btn-theme {
+      width: 34px; height: 34px; padding: 0;
+      display: inline-grid; place-items: center;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--r-xs);
+      color: var(--text-2);
+      font-size: 15px;
+      cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s;
+      flex-shrink: 0;
+    }
+    .btn-theme:hover { background: var(--surface-2); color: var(--text-1); }
+
+    /* icons – show the right one per mode */
+    .btn-theme .ico-sun  { display: none; }
+    .btn-theme .ico-moon { display: block; }
+    body.light .btn-theme .ico-sun  { display: block; }
+    body.light .btn-theme .ico-moon { display: none; }
+
+    /* smooth theme transition */
+    body, .topbar, .kpi-card, .chart-card, .insights-card, .iitem, .loader {
+      transition: background .2s, border-color .2s, color .2s;
+    }
   </style>
 </head>
 <body>
@@ -350,6 +395,10 @@
       <strong id="lastUpdate">—</strong>
     </div>
     <span class="badge-live">Ao vivo</span>
+    <button class="btn-theme" id="btnTheme" onclick="toggleTheme()" title="Alternar tema" aria-label="Alternar entre modo claro e escuro">
+      <span class="ico-moon">🌙</span>
+      <span class="ico-sun">☀️</span>
+    </button>
     <button class="btn btn-primary" id="btnRefresh" onclick="loadAll()">
       <span id="refreshIcon">↻</span> Atualizar dados
     </button>
@@ -858,18 +907,45 @@ function rgba(hex, a) {
 }
 
 const FONT = { family:"'Inter', sans-serif" };
-const TOOLTIP_BASE = {
-  backgroundColor:'#0f0f12',
-  titleFont:{...FONT,size:12,weight:'600'},
-  bodyFont:{...FONT,size:11},
-  borderColor:'#27272a',
-  borderWidth:1,
-  padding:12, cornerRadius:8, caretSize:4,
-  titleColor:'#fafafa',
-  bodyColor:'#a1a1aa',
-};
-const TICK = { font:{...FONT,size:11}, color:'#52525b' };
-const GRID_Y = { color:'#1a1a1e', drawBorder:false };
+
+/* ── Theme helpers ─────────────────────────────────────────────── */
+function isLight() { return document.body.classList.contains('light'); }
+
+function themeTokens() {
+  return isLight()
+    ? { bg:'#ffffff', surface:'#f4f4f5', border:'#e4e4e7', text1:'#09090b', text2:'#52525b', text3:'#a1a1aa' }
+    : { bg:'#0f0f12', surface:'#1a1a1e', border:'#27272a', text1:'#fafafa', text2:'#a1a1aa', text3:'#52525b' };
+}
+
+function getTooltipBase() {
+  const t = themeTokens();
+  return {
+    backgroundColor: t.bg,
+    titleFont: {...FONT, size:12, weight:'600'},
+    bodyFont:  {...FONT, size:11},
+    borderColor: t.border,
+    borderWidth: 1,
+    padding: 12, cornerRadius: 8, caretSize: 4,
+    titleColor: t.text1,
+    bodyColor:  t.text2,
+  };
+}
+function getTick()  { const t = themeTokens(); return { font:{...FONT,size:11}, color:t.text3 }; }
+function getGridY() { const t = themeTokens(); return { color:t.surface, drawBorder:false }; }
+
+function toggleTheme() {
+  const isNowLight = document.body.classList.toggle('light');
+  localStorage.setItem('dash-theme', isNowLight ? 'light' : 'dark');
+  // Re-render charts with new palette
+  if (Object.keys(DATA).length) renderCharts();
+}
+
+// Apply saved theme before first render
+(function initTheme() {
+  const saved = localStorage.getItem('dash-theme');
+  const preferLight = saved ? saved === 'light' : window.matchMedia('(prefers-color-scheme: light)').matches;
+  if (preferLight) document.body.classList.add('light');
+})();
 
 function killChart(id) {
   if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; }
@@ -927,12 +1003,12 @@ function renderGrowth() {
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{
-        legend:{ position:'bottom', labels:{...FONT,usePointStyle:true,pointStyle:'circle',padding:16,font:{...FONT,size:11}} },
-        tooltip:{ ...TOOLTIP_BASE, callbacks:{ label: c=>` ${c.dataset.label}: ${fmtN(c.raw)}` } },
+        legend:{ position:'bottom', labels:{...FONT,usePointStyle:true,pointStyle:'circle',padding:16,font:{...FONT,size:11},color:themeTokens().text2} },
+        tooltip:{ ...getTooltipBase(), callbacks:{ label: c=>` ${c.dataset.label}: ${fmtN(c.raw)}` } },
       },
       scales:{
-        x:{ grid:{display:false}, border:{display:false}, ticks:TICK },
-        y:{ grid:GRID_Y, border:{display:false}, ticks:{...TICK, callback:v=>fmtK(v)} },
+        x:{ grid:{display:false}, border:{display:false}, ticks:getTick() },
+        y:{ grid:getGridY(), border:{display:false}, ticks:{...getTick(), callback:v=>fmtK(v)} },
       },
     },
   });
@@ -960,11 +1036,11 @@ function renderImpressions() {
       responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
-        tooltip:{ ...TOOLTIP_BASE, callbacks:{ label:c=>` ${fmtK(c.raw)} impressões` } },
+        tooltip:{ ...getTooltipBase(), callbacks:{ label:c=>` ${fmtK(c.raw)} impressões` } },
       },
       scales:{
-        x:{ grid:{display:false}, border:{display:false}, ticks:TICK },
-        y:{ grid:GRID_Y, border:{display:false}, ticks:{...TICK, callback:v=>fmtK(v)} },
+        x:{ grid:{display:false}, border:{display:false}, ticks:getTick() },
+        y:{ grid:getGridY(), border:{display:false}, ticks:{...getTick(), callback:v=>fmtK(v)} },
       },
     },
   });
@@ -992,11 +1068,11 @@ function renderCTR() {
       responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
-        tooltip:{ ...TOOLTIP_BASE, callbacks:{ label:c=>` CTR: ${fmtPct(c.raw)}` } },
+        tooltip:{ ...getTooltipBase(), callbacks:{ label:c=>` CTR: ${fmtPct(c.raw)}` } },
       },
       scales:{
-        x:{ grid:{display:false}, border:{display:false}, ticks:TICK },
-        y:{ grid:GRID_Y, border:{display:false}, ticks:{...TICK, callback:v=>v.toFixed(1)+'%'} },
+        x:{ grid:{display:false}, border:{display:false}, ticks:getTick() },
+        y:{ grid:getGridY(), border:{display:false}, ticks:{...getTick(), callback:v=>v.toFixed(1)+'%'} },
       },
     },
   });
@@ -1023,9 +1099,9 @@ function renderReach() {
     options:{
       responsive:true, maintainAspectRatio:false, cutout:'64%',
       plugins:{
-        legend:{ position:'bottom', labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{...FONT,size:11}} },
+        legend:{ position:'bottom', labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{...FONT,size:11},color:themeTokens().text2} },
         tooltip:{
-          ...TOOLTIP_BASE,
+          ...getTooltipBase(),
           callbacks:{
             label: c => {
               const total = c.dataset.data.reduce((a,b)=>a+b,0);
