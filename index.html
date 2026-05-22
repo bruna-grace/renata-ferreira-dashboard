@@ -506,8 +506,8 @@
     <div class="section-label">Alcance &amp; Análise</div>
     <div class="row-2-1">
       <div class="chart-card">
-        <div class="chart-title">Alcance por Canal</div>
-        <div class="chart-sub">Distribuição do alcance total entre os canais</div>
+        <div class="chart-title">Visibilidade por Canal</div>
+        <div class="chart-sub">Alcance (Instagram) ou Impressões (demais canais)</div>
         <div class="canvas-wrap-donut"><canvas id="cReach"></canvas></div>
       </div>
 
@@ -1187,7 +1187,10 @@ function renderCTR() {
 /* ── 4. Rosca — alcance ─────────────────────────────────────── */
 function renderReach() {
   killChart('r');
-  const chs = Object.values(DATA).filter(c=>c.totals.reach>0);
+  /* reach = alcance direto; fallback = impressões para canais sem coluna Alcance */
+  const chs = Object.values(DATA).map(c => ({
+    ...c, _vis: c.totals.reach > 0 ? c.totals.reach : c.totals.impressions
+  })).filter(c => c._vis > 0);
   if (!chs.length) return;
 
   CHARTS.r = new Chart(document.getElementById('cReach').getContext('2d'), {
@@ -1195,7 +1198,7 @@ function renderReach() {
     data:{
       labels: chs.map(c=>c.cfg.name),
       datasets:[{
-        data: chs.map(c=>c.totals.reach),
+        data: chs.map(c=>c._vis),
         backgroundColor: chs.map(c=>rgba(c.cfg.color,.88)),
         borderColor: chs.map(c=>c.cfg.color),
         borderWidth:2, hoverOffset:8,
@@ -1229,14 +1232,16 @@ function renderInsights() {
 
   const ins = [];
 
-  /* canal com maior alcance */
-  const byReach = chs.filter(c=>c.totals.reach>0).sort((a,b)=>b.totals.reach-a.totals.reach);
+  /* canal com maior visibilidade (alcance ou impressões) */
+  const withVis = chs.map(c=>({...c,_vis:c.totals.reach>0?c.totals.reach:c.totals.impressions}));
+  const byReach = withVis.filter(c=>c._vis>0).sort((a,b)=>b._vis-a._vis);
   if (byReach.length) {
     const top   = byReach[0];
-    const total = byReach.reduce((s,c)=>s+c.totals.reach,0);
-    const pct   = total>0 ? ((top.totals.reach/total)*100).toFixed(0)+'%' : '';
-    ins.push({ cls:'ok', ico:'🏆', t:'Maior Alcance',
-      txt:`${top.cfg.name} lidera com ${fmtK(top.totals.reach)} pessoas alcançadas${pct?' — '+pct+' do alcance total':''}.` });
+    const total = byReach.reduce((s,c)=>s+c._vis,0);
+    const pct   = total>0 ? ((top._vis/total)*100).toFixed(0)+'%' : '';
+    const label = top.totals.reach>0 ? 'pessoas alcançadas' : 'impressões';
+    ins.push({ cls:'ok', ico:'🏆', t:'Maior Visibilidade',
+      txt:`${top.cfg.name} lidera com ${fmtK(top._vis)} ${label}${pct?' — '+pct+' do total':''}.` });
   }
 
   /* canal com maior crescimento */
