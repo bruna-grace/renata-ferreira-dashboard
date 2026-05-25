@@ -641,8 +641,9 @@
     <div class="row-2-1">
       <div class="chart-card">
         <div class="chart-title">Visibilidade por Canal</div>
-        <div class="chart-sub">Alcance (Instagram) ou Impressões (demais canais)</div>
+        <div class="chart-sub" id="reachSub">Alcance (social) ou Impressões (busca/ads) · somente canais com dados disponíveis</div>
         <div class="canvas-wrap-donut"><canvas id="cReach"></canvas></div>
+        <div id="reachMissing" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"></div>
       </div>
 
       <div class="insights-card">
@@ -1349,9 +1350,29 @@ function renderCTR() {
 function renderReach() {
   killChart('r');
   /* reach = alcance direto; fallback = impressões para canais sem coluna Alcance */
-  const chs = Object.values(DATA).map(c => ({
+  const all = Object.values(DATA).map(c => ({
     ...c, _vis: c.totals.reach > 0 ? c.totals.reach : c.totals.impressions
-  })).filter(c => c._vis > 0);
+  }));
+  const chs     = all.filter(c => c._vis > 0);
+  const missing = all.filter(c => c._vis === 0);
+
+  /* nota sobre canais sem dados */
+  const noteEl = document.getElementById('reachMissing');
+  if (noteEl) {
+    if (missing.length) {
+      const t = themeTokens();
+      noteEl.style.display = 'block';
+      noteEl.innerHTML = missing.map(c => `
+        <span style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 6px 0;font-size:11px;color:${t.text3}">
+          <span>${c.cfg.icon}</span>
+          <span>${c.cfg.name}</span>
+          <span style="font-size:10px;background:${t.surface};border:1px solid ${t.border};border-radius:3px;padding:1px 5px">sem dados</span>
+        </span>`).join('');
+    } else {
+      noteEl.style.display = 'none';
+    }
+  }
+
   if (!chs.length) return;
 
   CHARTS.r = new Chart(document.getElementById('cReach').getContext('2d'), {
