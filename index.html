@@ -202,6 +202,13 @@
       color: var(--text-1);
     }
 
+    .kpi-desc {
+      font-size: 11px;
+      color: var(--text-3);
+      line-height: 1.45;
+      margin-bottom: 8px;
+    }
+
     .kpi-foot { font-size: 11px; color: var(--text-3); }
 
     .pos { color: var(--green); font-weight: 500; }
@@ -687,6 +694,7 @@ const CHANNELS = [
     id:        'instagram',
     name:      'Instagram',
     label:     'Seguidores',
+    desc:      'Total atual de seguidores da conta',
     color:     '#fafafa',
     bgIco:     '#1a1a1e',
     icon:      '📸',
@@ -696,6 +704,7 @@ const CHANNELS = [
     id:        'facebook',
     name:      'Facebook',
     label:     'Seguidores',
+    desc:      'Total atual de seguidores da página',
     color:     '#d4d4d8',
     bgIco:     '#1a1a1e',
     icon:      '👍',
@@ -704,7 +713,8 @@ const CHANNELS = [
   {
     id:        'gsc',
     name:      'Google Search',
-    label:     'Cliques',
+    label:     'Cliques orgânicos',
+    desc:      'Visitas vindas de resultados do Google · acumulado no período',
     color:     '#a1a1aa',
     bgIco:     '#1a1a1e',
     icon:      '🔍',
@@ -714,6 +724,7 @@ const CHANNELS = [
     id:        'youtube',
     name:      'YouTube',
     label:     'Inscritos',
+    desc:      'Total atual de inscritos no canal',
     color:     '#71717a',
     bgIco:     '#1a1a1e',
     icon:      '▶️',
@@ -722,7 +733,8 @@ const CHANNELS = [
   {
     id:        'google_ads',
     name:      'Google ADS',
-    label:     'Cliques',
+    label:     'Cliques em anúncios',
+    desc:      'Cliques em campanhas pagas · acumulado no período',
     color:     '#52525b',
     bgIco:     '#1a1a1e',
     icon:      '🎯',
@@ -1111,7 +1123,8 @@ function renderKPIs() {
           <div class="kpi-ico" style="--bg-ico:${ch.cfg.bgIco};background:${ch.cfg.bgIco}">${ch.cfg.icon}</div>
         </div>
         <div class="kpi-val">${fmtK(v)}</div>
-        <div class="kpi-foot">${ch.cfg.label}${growthHtml ? ' &middot; '+growthHtml : ''}</div>
+        <div class="kpi-desc"><strong style="color:var(--text-2);font-weight:500">${ch.cfg.label}</strong><br>${ch.cfg.desc||''}</div>
+        ${growthHtml ? `<div class="kpi-foot">${growthHtml}</div>` : ''}
       </div>`;
   });
 
@@ -1121,11 +1134,11 @@ function renderKPIs() {
     grid.innerHTML += `
       <div class="kpi-card">
         <div class="kpi-top">
-          <span class="kpi-label">Investimento ADS</span>
+          <span class="kpi-label">Google ADS</span>
           <div class="kpi-ico">💰</div>
         </div>
         <div class="kpi-val" style="font-size:22px">${fmtBRL(totalInv)}</div>
-        <div class="kpi-foot">Total investido no período</div>
+        <div class="kpi-desc"><strong style="color:var(--text-2);font-weight:500">Investimento total</strong><br>Soma de tudo gasto em campanhas pagas no período</div>
       </div>`;
   }
 
@@ -1140,7 +1153,7 @@ function renderKPIs() {
           <div class="kpi-ico">🎯</div>
         </div>
         <div class="kpi-val">${fmtPct(avg)}</div>
-        <div class="kpi-foot">Taxa de cliques média — todos os canais</div>
+        <div class="kpi-desc"><strong style="color:var(--text-2);font-weight:500">CTR médio</strong><br>% de pessoas que clicaram ao ver o conteúdo · média entre canais</div>
       </div>`;
   }
 }
