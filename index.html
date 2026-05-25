@@ -412,6 +412,133 @@
     @media(max-width:720px) {
       .date-filter { display: none; }
     }
+
+    /* ─── Destaques por Canal ─────────────────────────────────── */
+    .destaques-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .destaque-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: border-color .2s, background .2s;
+    }
+
+    .destaque-card:hover {
+      border-color: #3f3f46;
+      background: var(--surface-2);
+    }
+
+    body.light .destaque-card:hover { border-color: #d4d4d8; }
+
+    .destaque-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .destaque-header-left {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .destaque-icon { font-size: 15px; }
+
+    .destaque-channel {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      letter-spacing: -.1px;
+    }
+
+    .destaque-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      flex-shrink: 0;
+    }
+
+    .destaque-metric { display: flex; flex-direction: column; gap: 3px; }
+
+    .destaque-val {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1;
+      color: var(--text-1);
+    }
+
+    .destaque-metric-label {
+      font-size: 10px;
+      color: var(--text-3);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .destaque-content { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+
+    .destaque-title {
+      font-size: 12px;
+      color: var(--text-2);
+      line-height: 1.55;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .destaque-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+    }
+
+    .destaque-period { font-size: 11px; color: var(--text-3); }
+
+    .destaque-link {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-2);
+      text-decoration: none;
+      padding: 3px 9px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .destaque-link:hover { background: var(--surface-2); color: var(--text-1); }
+
+    .destaque-empty .destaque-channel { color: var(--text-3); }
+
+    .destaque-nodata {
+      font-size: 12px;
+      color: var(--text-3);
+      font-style: italic;
+      text-align: center;
+      padding: 18px 0 4px;
+    }
+
+    @media (max-width: 1100px) { .destaques-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px)  { .destaques-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -521,6 +648,13 @@
         </div>
         <div class="insights-list" id="insightsList"></div>
       </div>
+    </div>
+
+    <!-- ── Destaques por Canal ── -->
+    <div id="destaques-section" style="display:none">
+      <div class="divider"></div>
+      <div class="section-label">Destaques por Canal</div>
+      <div class="destaques-grid" id="destaquesGrid"></div>
     </div>
 
   </div><!-- /#dash -->
@@ -799,9 +933,10 @@ function fetchSheet(sheetName) {
 
 
 /* ── Estado global ──────────────────────────────────────────── */
-let DATA       = {};
-let CHARTS     = {};
-let RAW_PARSED = {};   // { channelId: { parsed:{heads,rows}, cfg } }
+let DATA          = {};
+let CHARTS        = {};
+let RAW_PARSED    = {};   // { channelId: { parsed:{heads,rows}, cfg } }
+let DESTAQUES_RAW = null; // parsed da aba "Destaques"
 
 
 /* ── Formatters ─────────────────────────────────────────────── */
@@ -900,22 +1035,27 @@ function applyFilter() {
   renderKPIs();
   renderCharts();
   renderInsights();
+  renderDestaques();
 }
 
 
 /* ── MAIN LOADER ────────────────────────────────────────────── */
 async function loadAll() {
   showLoading();
-  DATA       = {};
-  RAW_PARSED = {};
+  DATA          = {};
+  RAW_PARSED    = {};
+  DESTAQUES_RAW = null;
 
-  const results = await Promise.allSettled(
-    CHANNELS.map(async c => {
-      const parsed = await fetchSheet(c.sheetName);
-      RAW_PARSED[c.id] = { parsed, cfg: c };
-      return { id: c.id, data: processChannel(parsed, c) };
-    })
-  );
+  const [results] = await Promise.all([
+    Promise.allSettled(
+      CHANNELS.map(async c => {
+        const parsed = await fetchSheet(c.sheetName);
+        RAW_PARSED[c.id] = { parsed, cfg: c };
+        return { id: c.id, data: processChannel(parsed, c) };
+      })
+    ),
+    fetchDestaques(),   // carrega em paralelo, não bloqueia em caso de falha
+  ]);
 
   const errors = [];
   results.forEach((res, i) => {
@@ -940,6 +1080,7 @@ async function loadAll() {
   renderKPIs();
   renderCharts();
   renderInsights();
+  renderDestaques();
   document.getElementById('lastUpdate').textContent =
     new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   initDateFilter();
@@ -1302,6 +1443,138 @@ function renderInsights() {
         <div>
           <div class="ititle">${it.t}</div>
           <div class="itext">${it.txt}</div>
+        </div>
+      </div>`;
+  });
+}
+
+
+/* ── Destaques por Canal ────────────────────────────────────── */
+
+/* Configuração visual de cada canal na seção de destaques */
+const DESTAQUE_CHANNELS = [
+  { id:'instagram', name:'Instagram',    icon:'📸', label:'Melhor alcance no período'     },
+  { id:'facebook',  name:'Facebook',     icon:'👍', label:'Melhor alcance no período'     },
+  { id:'gsc',       name:'Google Search',icon:'🔍', label:'Página mais acessada'          },
+  { id:'youtube',   name:'YouTube',      icon:'▶️', label:'Vídeo mais assistido'          },
+];
+
+/** Busca a aba "Destaques" — não bloqueia o load se não existir */
+async function fetchDestaques() {
+  try {
+    DESTAQUES_RAW = await fetchSheet('Destaques');
+  } catch(e) {
+    console.info('Aba Destaques não encontrada — seção ocultada.', e.message);
+    DESTAQUES_RAW = null;
+  }
+}
+
+/** Retorna linhas da aba Destaques filtradas pelo intervalo de datas selecionado */
+function getFilteredDestaques() {
+  if (!DESTAQUES_RAW) return [];
+
+  const h = DESTAQUES_RAW.heads;
+  const colCanal   = findCol(h, ['canal','channel','rede']);
+  const colData    = findCol(h, ALIASES.date);
+  const colPeriodo = findCol(h, ['periodo','period','semana','referencia']);
+  const colTipo    = findCol(h, ['tipo','type','formato','format','categoria']);
+  const colTitulo  = findCol(h, ['titulo','title','conteudo','content','descricao','caption','pagina','page','video']);
+  const colMetrica = findCol(h, ['metrica','metric','indicador','kpi']);
+  const colValor   = findCol(h, ['valor','value','resultado','result','numero']);
+  const colURL     = findCol(h, ['url','link','href','permalink']);
+
+  const fromVal = document.getElementById('filterFrom')?.value;
+  const toVal   = document.getElementById('filterTo')?.value;
+  const from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const to   = toVal   ? new Date(toVal   + 'T23:59:59') : null;
+
+  return DESTAQUES_RAW.rows
+    .filter(row => {
+      if (!from && !to) return true;
+      if (!colData) return true;
+      const d = row[colData];
+      const date = d instanceof Date ? d : toDate(d);
+      if (!date) return true;
+      if (from && date < from) return false;
+      if (to   && date > to)   return false;
+      return true;
+    })
+    .map(row => ({
+      canal:   colCanal   ? norm(String(row[colCanal]||'')) : '',
+      periodo: colPeriodo ? String(row[colPeriodo]||'')     : '',
+      tipo:    colTipo    ? String(row[colTipo]||'')        : '',
+      titulo:  colTitulo  ? String(row[colTitulo]||'')      : '',
+      metrica: colMetrica ? String(row[colMetrica]||'')     : '',
+      valor:   colValor   ? toNum(row[colValor])            : null,
+      url:     colURL     ? String(row[colURL]||'')         : '',
+    }));
+}
+
+/** Renderiza a seção Destaques por Canal */
+function renderDestaques() {
+  const section = document.getElementById('destaques-section');
+  const grid    = document.getElementById('destaquesGrid');
+  if (!section || !grid) return;
+
+  if (!DESTAQUES_RAW) { section.style.display = 'none'; return; }
+
+  const rows = getFilteredDestaques();
+  section.style.display = 'block';
+  grid.innerHTML = '';
+
+  DESTAQUE_CHANNELS.forEach(ch => {
+    /* entre as linhas do período, pega a de maior valor para este canal */
+    const channelRows = rows.filter(r =>
+      r.canal === ch.id ||
+      r.canal.includes(ch.id.slice(0,4)) ||          // "inst" → instagram
+      (ch.id === 'gsc' && (r.canal.includes('gsc') || r.canal.includes('google')))
+    );
+    const best = channelRows.length
+      ? [...channelRows].sort((a,b) => (b.valor||0) - (a.valor||0))[0]
+      : null;
+
+    if (!best) {
+      grid.innerHTML += `
+        <div class="destaque-card destaque-empty">
+          <div class="destaque-header">
+            <div class="destaque-header-left">
+              <span class="destaque-icon">${ch.icon}</span>
+              <span class="destaque-channel">${ch.name}</span>
+            </div>
+          </div>
+          <div class="destaque-nodata">Sem dados no período</div>
+          <div class="destaque-footer">
+            <span class="destaque-period">—</span>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const valor   = best.valor !== null ? fmtK(best.valor) : '—';
+    const hasURL  = best.url && best.url !== 'null' && best.url.startsWith('http');
+    const linkHtml = hasURL
+      ? `<a href="${best.url}" target="_blank" rel="noopener" class="destaque-link">↗ Ver</a>`
+      : '';
+
+    grid.innerHTML += `
+      <div class="destaque-card">
+        <div class="destaque-header">
+          <div class="destaque-header-left">
+            <span class="destaque-icon">${ch.icon}</span>
+            <span class="destaque-channel">${ch.name}</span>
+          </div>
+          ${best.tipo ? `<span class="destaque-badge">${best.tipo}</span>` : ''}
+        </div>
+        <div class="destaque-metric">
+          <div class="destaque-val">${valor}</div>
+          <div class="destaque-metric-label">${best.metrica || ch.label}</div>
+        </div>
+        <div class="destaque-content">
+          <div class="destaque-title">${best.titulo || '—'}</div>
+          <div class="destaque-footer">
+            <span class="destaque-period">${best.periodo}</span>
+            ${linkHtml}
+          </div>
         </div>
       </div>`;
   });
