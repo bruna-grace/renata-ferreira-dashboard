@@ -546,6 +546,22 @@
 
     @media (max-width: 1100px) { .destaques-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 600px)  { .destaques-grid { grid-template-columns: 1fr; } }
+
+    /* ── CRM ──────────────────────────────────────────────────── */
+    .crm-kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .crm-kpi { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:20px; }
+    .crm-kpi-val { font-size:36px; font-weight:700; letter-spacing:-1.5px; line-height:1; color:var(--text-1); }
+    .crm-kpi-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-top:6px; }
+    .crm-kpi-sub { font-size:12px; color:var(--text-2); margin-top:3px; }
+    .crm-charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .crm-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .crm-bar-label { font-size:12px; color:var(--text-2); width:100px; flex-shrink:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .crm-bar-track { flex:1; background:var(--surface-2); border-radius:4px; height:8px; overflow:hidden; }
+    .crm-bar-fill { height:100%; border-radius:4px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+    .crm-bar-count { font-size:11px; color:var(--text-3); width:28px; text-align:right; flex-shrink:0; }
+    .crm-empty { font-size:12px; color:var(--text-3); font-style:italic; padding:12px 0; }
+    @media(max-width:900px){ .crm-kpi-grid{grid-template-columns:repeat(2,1fr);} .crm-charts-grid{grid-template-columns:1fr;} }
+    @media(max-width:500px){ .crm-kpi-grid{grid-template-columns:1fr;} }
   </style>
 </head>
 <body>
@@ -665,6 +681,25 @@
       <div class="destaques-grid" id="destaquesGrid"></div>
     </div>
 
+    <!-- ── CRM ── -->
+    <div id="crm-section" style="display:none">
+      <div class="divider"></div>
+      <div class="section-label">CRM — Controle de Leads</div>
+      <div class="crm-kpi-grid" id="crmKpis"></div>
+      <div class="crm-charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Origem dos Leads</div>
+          <div class="chart-sub">De onde vieram os contatos no período</div>
+          <div id="crmOrigemBars" style="margin-top:12px"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Funil por Status</div>
+          <div class="chart-sub">Distribuição por etapa do lead</div>
+          <div id="crmStatusBars" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /#dash -->
 </main>
 
@@ -688,6 +723,14 @@
 
 /* ── ID DA PLANILHA ─────────────────────────────────────────── */
 const SHEET_ID = '1RuTUcnxjWmAkXYtCQSLRX3pLdLo6H1qsTskGdQTrTeU';
+
+/* ── CRM — planilha separada (somente leitura) ──────────────── */
+const CRM_SHEET_ID = '18OD1mDoDd4JMtYOvonqdGj18HxmWrCvRStn2Yh-p9F0';
+const CRM_TABS = [
+  'Setembro 2025','Outubro 2025','Novembro 2025','Dezembro 2025',
+  'Janeiro 2026','fevereiro 2026','3 Março 2026',
+  'Abril 2026','1 Maio 2026','Junho 2026',
+];
 
 /* ── CANAIS ──────────────────────────────────────────────────── */
 const CHANNELS = [
@@ -950,6 +993,7 @@ let DATA          = {};
 let CHARTS        = {};
 let RAW_PARSED    = {};   // { channelId: { parsed:{heads,rows}, cfg } }
 let DESTAQUES_RAW = null; // parsed da aba "Destaques"
+let CRM_RAW       = [];  // linhas normalizadas do CRM
 
 
 /* ── Formatters ─────────────────────────────────────────────── */
@@ -1049,6 +1093,7 @@ function applyFilter() {
   renderCharts();
   renderInsights();
   renderDestaques();
+  renderCRM();
 }
 
 
@@ -1058,6 +1103,7 @@ async function loadAll() {
   DATA          = {};
   RAW_PARSED    = {};
   DESTAQUES_RAW = null;
+  CRM_RAW       = [];
 
   const [results] = await Promise.all([
     Promise.allSettled(
@@ -1068,6 +1114,7 @@ async function loadAll() {
       })
     ),
     fetchDestaques(),   // carrega em paralelo, não bloqueia em caso de falha
+    fetchCRM(),         // CRM — planilha separada, não bloqueia
   ]);
 
   const errors = [];
@@ -1094,6 +1141,7 @@ async function loadAll() {
   renderCharts();
   renderInsights();
   renderDestaques();
+  renderCRM();
   document.getElementById('lastUpdate').textContent =
     new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   initDateFilter();
@@ -1612,6 +1660,202 @@ function renderDestaques() {
         </div>
       </div>`;
   });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   CRM — Controle de Leads
+   Lê planilha separada (CRM_SHEET_ID), somente leitura.
+   Duas estruturas de dados:
+     - Antiga (Set–Fev): Nome|Telefone|Origem|Data|Fechou?|Motivo
+     - Nova   (Mar+):    STATUS|Nome|Telefone|Origem|Cidade|Data|…
+   ═══════════════════════════════════════════════════════════════ */
+
+function fetchCRMSheet(tabName) {
+  return new Promise((resolve, reject) => {
+    const cb = 'crmCb' + Date.now() + Math.floor(Math.random() * 99999);
+    const timer = setTimeout(() => {
+      delete window[cb]; document.getElementById(cb)?.remove();
+      reject(new Error('timeout: ' + tabName));
+    }, 12000);
+
+    window[cb] = function(data) {
+      clearTimeout(timer); delete window[cb]; document.getElementById(cb)?.remove();
+      if (!data || data.status === 'error') { reject(new Error('gviz err: ' + tabName)); return; }
+      try { resolve(parseGviz(data)); } catch(e) { reject(e); }
+    };
+
+    const script = document.createElement('script');
+    script.id  = cb;
+    /* range=A2:J → pula linha 1 (título mesclado), usa linha 2 como cabeçalho */
+    script.src = 'https://docs.google.com/spreadsheets/d/' + CRM_SHEET_ID +
+                 '/gviz/tq?tqx=out:json;responseHandler:' + cb +
+                 '&sheet=' + encodeURIComponent(tabName) +
+                 '&range=A2:J&headers=1&_nc=' + Date.now();
+    script.onerror = () => { clearTimeout(timer); delete window[cb]; script.remove(); reject(new Error('err: ' + tabName)); };
+    document.head.appendChild(script);
+  });
+}
+
+async function fetchCRM() {
+  CRM_RAW = [];
+  const results = await Promise.allSettled(CRM_TABS.map(tab => fetchCRMSheet(tab)));
+  results.forEach(res => {
+    if (res.status === 'fulfilled') CRM_RAW.push(...parseCRMRows(res.value));
+  });
+  CRM_RAW.sort((a,b) => (!a.date ? 1 : !b.date ? -1 : a.date - b.date));
+}
+
+function parseCRMDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) { const y = +m[3] < 50 ? 2000 + +m[3] : 1900 + +m[3]; return new Date(y, +m[2]-1, +m[1]); }
+  return null;
+}
+
+function normCRMStatus(raw, isNew) {
+  if (!raw) return isNew ? 'Sem status' : 'Não convertido';
+  const s = String(raw).trim().toUpperCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if (!isNew) return (s === 'SIM' ? 'Finalizado' : 'Não convertido');
+  if (s.startsWith('AGEN')) return 'Agendado';
+  if (s.startsWith('DECL')) return 'Declinado';
+  if (s.startsWith('FOLL')) return 'Follow';
+  if (s.startsWith('FINAL')) return 'Finalizado';
+  return String(raw).trim() || 'Sem status';
+}
+
+function normCRMOrigem(raw) {
+  if (!raw || raw === '-' || raw === 'null') return 'Não informado';
+  const s = String(raw).trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if (s.includes('instagram')) return 'Instagram';
+  if (s.includes('youtube'))   return 'YouTube';
+  if (s.includes('google'))    return 'Google';
+  if (s.includes('whatsapp'))  return 'WhatsApp';
+  if (s.includes('indicac') || s.includes('dr.') || s.includes('dra.')) return 'Indicação';
+  if (!s || s === 'nao informado' || s === 'nao_informado') return 'Não informado';
+  return String(raw).trim();
+}
+
+function parseCRMRows({ heads, rows }) {
+  if (!heads || !rows) return [];
+  const isNew = heads[0] === 'status';
+  const result = [];
+  for (const r of rows) {
+    // pula linhas de cabeçalho repetidas (ex: Maio 2026 tem 2 seções)
+    const a0 = String(r[heads[0]] || '').trim();
+    if (a0 === 'STATUS' || a0 === 'Nome' || a0 === 'status' || a0 === 'nome') continue;
+    // pula linhas sem nome nem origem
+    const nome   = isNew ? (r['nome']||'') : (r[heads[0]]||'');
+    const origem = isNew ? (r['origem']||r['origem_']||'') : (r['origem']||'');
+    if (!nome && !origem) continue;
+
+    const rawDate   = r['data_contato'] || r['data'] || null;
+    const rawStatus = isNew ? (r['status']||'') : (r['fechou']||r['fechou_']||'');
+
+    result.push({
+      nome:   String(nome).trim(),
+      origem: normCRMOrigem(String(origem).trim()),
+      status: normCRMStatus(String(rawStatus).trim(), isNew),
+      date:   parseCRMDate(rawDate),
+    });
+  }
+  return result;
+}
+
+function getFilteredCRM() {
+  const fromVal = document.getElementById('filterFrom')?.value;
+  const toVal   = document.getElementById('filterTo')?.value;
+  const from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const to   = toVal   ? new Date(toVal   + 'T23:59:59') : null;
+  return CRM_RAW.filter(r => {
+    if (!r.date) return true; // sem data: inclui sempre
+    if (from && r.date < from) return false;
+    if (to   && r.date > to)   return false;
+    return true;
+  });
+}
+
+function renderCRM() {
+  const section = document.getElementById('crm-section');
+  if (!section) return;
+  if (!CRM_RAW.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const leads = getFilteredCRM();
+
+  /* ── KPIs ── */
+  const total      = leads.length;
+  const convertidos = leads.filter(l => l.status === 'Finalizado' || l.status === 'Agendado').length;
+  const taxa        = total > 0 ? (convertidos / total * 100) : 0;
+
+  document.getElementById('crmKpis').innerHTML = `
+    <div class="crm-kpi">
+      <div class="crm-kpi-val">${total}</div>
+      <div class="crm-kpi-label">Total de Leads</div>
+      <div class="crm-kpi-sub">contatos no período</div>
+    </div>
+    <div class="crm-kpi">
+      <div class="crm-kpi-val">${convertidos}</div>
+      <div class="crm-kpi-label">Convertidos</div>
+      <div class="crm-kpi-sub">agendados ou finalizados</div>
+    </div>
+    <div class="crm-kpi">
+      <div class="crm-kpi-val">${taxa.toFixed(0)}%</div>
+      <div class="crm-kpi-label">Taxa de Conversão</div>
+      <div class="crm-kpi-sub">sobre total de leads</div>
+    </div>`;
+
+  /* ── Origem ── */
+  const origemColors = {
+    'Instagram':'#c13584','YouTube':'#ef4444','Google':'#4285f4',
+    'WhatsApp':'#25d366','Indicação':'#f59e0b','Não informado':'#71717a',
+  };
+  const origemCount = {};
+  leads.forEach(l => { origemCount[l.origem] = (origemCount[l.origem]||0) + 1; });
+  const origemSorted = Object.entries(origemCount).sort((a,b) => b[1]-a[1]);
+  const origemMax = origemSorted[0]?.[1] || 1;
+
+  document.getElementById('crmOrigemBars').innerHTML = origemSorted.length
+    ? origemSorted.map(([label,count]) => `
+        <div class="crm-bar-row">
+          <div class="crm-bar-label" title="${label}">${label}</div>
+          <div class="crm-bar-track">
+            <div class="crm-bar-fill" style="width:${(count/origemMax*100).toFixed(1)}%;background:${origemColors[label]||'#71717a'}"></div>
+          </div>
+          <div class="crm-bar-count">${count}</div>
+        </div>`).join('')
+    : '<div class="crm-empty">Sem dados no período</div>';
+
+  /* ── Status ── */
+  const statusColors = {
+    'Finalizado':'#22c55e','Agendado':'#3b82f6','Follow':'#f59e0b',
+    'Declinado':'#ef4444','Não convertido':'#71717a','Sem status':'#52525b',
+  };
+  const statusOrder = ['Finalizado','Agendado','Follow','Declinado','Não convertido','Sem status'];
+  const statusCount = {};
+  leads.forEach(l => { statusCount[l.status] = (statusCount[l.status]||0) + 1; });
+  const statusSorted = statusOrder
+    .filter(s => statusCount[s])
+    .map(s => [s, statusCount[s]])
+    .concat(Object.entries(statusCount).filter(([s]) => !statusOrder.includes(s)));
+  const statusMax = statusSorted[0]?.[1] || 1;
+
+  document.getElementById('crmStatusBars').innerHTML = statusSorted.length
+    ? statusSorted.map(([label,count]) => `
+        <div class="crm-bar-row">
+          <div class="crm-bar-label" title="${label}">${label}</div>
+          <div class="crm-bar-track">
+            <div class="crm-bar-fill" style="width:${(count/statusMax*100).toFixed(1)}%;background:${statusColors[label]||'#71717a'}"></div>
+          </div>
+          <div class="crm-bar-count">${count}</div>
+        </div>`).join('')
+    : '<div class="crm-empty">Sem dados no período</div>';
 }
 
 
