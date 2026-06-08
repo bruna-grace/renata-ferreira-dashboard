@@ -729,7 +729,7 @@ const CRM_SHEET_ID = '18OD1mDoDd4JMtYOvonqdGj18HxmWrCvRStn2Yh-p9F0';
 const CRM_TABS = [
   'Setembro 2025','Outubro 2025','Novembro 2025','Dezembro 2025',
   'Janeiro 2026','fevereiro 2026','3 Março 2026',
-  'Abril 2026','1 Maio 2026','Junho 2026',
+  'Abril 2026','1 Maio 2026','Junho2026',
 ];
 
 /* ── CANAIS ──────────────────────────────────────────────────── */
@@ -1736,7 +1736,7 @@ function normCRMOrigem(raw) {
   if (s.includes('instagram')) return 'Instagram';
   if (s.includes('youtube'))   return 'YouTube';
   if (s.includes('google'))    return 'Google';
-  if (s.includes('whatsapp'))  return 'WhatsApp';
+  if (s.includes('whatsapp') || s.startsWith('whats'))  return 'WhatsApp';
   if (s.includes('indicac') || s.includes('dr.') || s.includes('dra.')) return 'Indicação';
   if (!s || s === 'nao informado' || s === 'nao_informado') return 'Não informado';
   return String(raw).trim();
