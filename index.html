@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard de Performance Digital</title>
+  <title>Dra. Renata Ferreira · Dashboard de Performance Digital</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     /* ─── shadcn/ui dark design tokens ──────────────────────── */
     :root {
@@ -547,19 +546,93 @@
     @media (max-width: 1100px) { .destaques-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 600px)  { .destaques-grid { grid-template-columns: 1fr; } }
 
+    /* ── Scorecards de totais ──────────────────────────────────── */
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px;
+    }
+    .score-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .score-label { font-size: 12px; color: var(--text-2); font-weight: 500; display:flex; align-items:center; gap:7px; }
+    .score-val   { font-size: 30px; font-weight: 700; letter-spacing: -1px; margin: 8px 0 4px; color: var(--text-1); }
+    .score-delta { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+    .score-delta.up   { color: var(--green); }
+    .score-delta.down { color: var(--red); }
+    .score-delta.flat { color: var(--text-3); }
+    .score-sub   { font-size: 11px; color: var(--text-3); margin-top: 8px; }
+
+    /* ── Tabela semanal ────────────────────────────────────────── */
+    .wtable-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow-x: auto; box-shadow: var(--shadow); }
+    .wtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .wtable th { text-align: right; padding: 12px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); border-bottom: 1px solid var(--border); background: var(--bg); white-space: nowrap; }
+    .wtable th:first-child, .wtable td:first-child { text-align: left; }
+    .wtable td { padding: 11px 16px; text-align: right; color: var(--text-2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .wtable tr:last-child td { border-bottom: none; }
+    .wtable tbody tr:hover td { background: var(--surface-2); }
+    .wtable td.num { color: var(--text-1); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .wtable .muted { color: var(--text-3); }
+
+    /* ── Toggle de tabela ──────────────────────────────────────── */
+    .section-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .table-toggle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-2);
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .table-toggle:hover { background: var(--surface-2); color: var(--text-1); }
+    .toggle-icon {
+      display: inline-block;
+      transition: transform 0.3s ease;
+      font-size: 10px;
+    }
+    .table-toggle.expanded .toggle-icon { transform: rotate(180deg); }
+    .table-container {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .table-container.expanded { max-height: 2000px; }
+
     /* ── CRM ──────────────────────────────────────────────────── */
-    .crm-kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .crm-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+    .crm-month-picker { display:flex; align-items:center; gap:8px; }
+    .crm-month-picker label { font-size:11px; color:var(--text-3); font-weight:500; text-transform:uppercase; letter-spacing:.5px; }
+    .crm-month-picker select {
+      font-family:inherit; font-size:13px; color:var(--text-1);
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--r-xs);
+      padding:6px 10px; cursor:pointer;
+    }
+    .crm-month-picker select:focus { outline:none; border-color:var(--text-3); }
+    .crm-kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+    .crm-note { font-size:12px; color:var(--text-3); margin-bottom:16px; }
+    .crm-note strong { color:var(--text-2); font-weight:600; }
     .crm-kpi { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:20px; }
     .crm-kpi-val { font-size:36px; font-weight:700; letter-spacing:-1.5px; line-height:1; color:var(--text-1); }
     .crm-kpi-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-top:6px; }
     .crm-kpi-sub { font-size:12px; color:var(--text-2); margin-top:3px; }
-    .crm-charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .crm-charts-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
     .crm-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
     .crm-bar-label { font-size:12px; color:var(--text-2); width:100px; flex-shrink:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .crm-bar-track { flex:1; background:var(--surface-2); border-radius:4px; height:8px; overflow:hidden; }
     .crm-bar-fill { height:100%; border-radius:4px; transition:width .6s cubic-bezier(.4,0,.2,1); }
     .crm-bar-count { font-size:11px; color:var(--text-3); width:28px; text-align:right; flex-shrink:0; }
     .crm-empty { font-size:12px; color:var(--text-3); font-style:italic; padding:12px 0; }
+    @media(max-width:1100px){ .crm-charts-grid{grid-template-columns:1fr 1fr;} }
     @media(max-width:900px){ .crm-kpi-grid{grid-template-columns:repeat(2,1fr);} .crm-charts-grid{grid-template-columns:1fr;} }
     @media(max-width:500px){ .crm-kpi-grid{grid-template-columns:1fr;} }
   </style>
@@ -573,8 +646,8 @@
   <div class="brand">
     <div class="brand-logo">📊</div>
     <div>
-      <div class="brand-name">Performance Digital</div>
-      <div class="brand-sub">Redes Sociais &amp; Google Ads</div>
+      <div class="brand-name">Dra. Renata Ferreira</div>
+      <div class="brand-sub">Performance Digital · Redes Sociais &amp; Google Ads</div>
     </div>
   </div>
 
@@ -623,69 +696,17 @@
   <!-- Dashboard -->
   <div id="dash" style="display:none">
 
-    <!-- ── KPIs ── -->
-    <div class="section-label">Indicadores Principais</div>
-    <div class="kpi-grid" id="kpiGrid"></div>
-
-    <div class="divider"></div>
-
-    <!-- ── Gráfico 1: crescimento (linha) ── -->
-    <div class="section-label">Histórico de Crescimento</div>
-    <div class="chart-card mb-28">
-      <div class="chart-title">Crescimento de Seguidores / Inscritos por Canal</div>
-      <div class="chart-sub">Evolução histórica ao longo do período selecionado</div>
-      <div class="canvas-wrap-lg"><canvas id="cGrowth"></canvas></div>
-    </div>
-
-    <!-- ── Gráficos 2 e 3: impressões + CTR ── -->
-    <div class="section-label">Visibilidade &amp; Engajamento</div>
-    <div class="row-2">
-      <div class="chart-card">
-        <div class="chart-title">Impressões por Canal</div>
-        <div class="chart-sub">Impressões (busca/ads) ou Alcance (redes sociais)</div>
-        <div class="canvas-wrap"><canvas id="cImpressions"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">CTR por Canal</div>
-        <div class="chart-sub">CTR (busca/ads) ou Engajamento (redes sociais)</div>
-        <div class="canvas-wrap"><canvas id="cCTR"></canvas></div>
-      </div>
-    </div>
-
-    <!-- ── Gráfico 4: alcance (rosca) + Insights ── -->
-    <div class="section-label">Alcance &amp; Análise</div>
-    <div class="row-2-1">
-      <div class="chart-card">
-        <div class="chart-title">Visibilidade por Canal</div>
-        <div class="chart-sub" id="reachSub">Alcance (social) ou Impressões (busca/ads) · somente canais com dados disponíveis</div>
-        <div class="canvas-wrap-donut"><canvas id="cReach"></canvas></div>
-        <div id="reachMissing" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"></div>
-      </div>
-
-      <div class="insights-card">
-        <div class="insights-head">
-          <div class="insights-ico">💡</div>
-          <div class="insights-hd-text">
-            <div class="t1">Análise Automática</div>
-            <div class="t2">Insights gerados a partir dos seus dados reais</div>
-          </div>
-        </div>
-        <div class="insights-list" id="insightsList"></div>
-      </div>
-    </div>
-
-    <!-- ── Destaques por Canal ── -->
-    <div id="destaques-section" style="display:none">
-      <div class="divider"></div>
-      <div class="section-label">Destaques por Canal</div>
-      <div class="destaques-grid" id="destaquesGrid"></div>
-    </div>
-
-    <!-- ── CRM ── -->
+    <!-- ── CRM (topo) ── -->
     <div id="crm-section" style="display:none">
-      <div class="divider"></div>
-      <div class="section-label">CRM — Controle de Leads</div>
+      <div class="crm-head">
+        <div class="section-label" style="margin:0">CRM — Controle de Leads</div>
+        <div class="crm-month-picker">
+          <label for="crmMonth">Mês</label>
+          <select id="crmMonth"></select>
+        </div>
+      </div>
       <div class="crm-kpi-grid" id="crmKpis"></div>
+      <div class="crm-note" id="crmIndicacaoNote"></div>
       <div class="crm-charts-grid">
         <div class="chart-card">
           <div class="chart-title">Origem dos Leads</div>
@@ -697,7 +718,56 @@
           <div class="chart-sub">Distribuição por etapa do lead</div>
           <div id="crmStatusBars" style="margin-top:12px"></div>
         </div>
+        <div class="chart-card">
+          <div class="chart-title">Convênios Médicos</div>
+          <div class="chart-sub" id="crmConvenioSub">Leads com plano de saúde, por operadora</div>
+          <div id="crmConvenioBars" style="margin-top:12px"></div>
+        </div>
       </div>
+
+      <div class="divider"></div>
+    </div>
+
+    <!-- ── Resumo do Período (Análise Automática) ── -->
+    <div class="section-label">Resumo do Período</div>
+    <div class="insights-card mb-28">
+      <div class="insights-head">
+        <div class="insights-ico">💡</div>
+        <div class="insights-hd-text">
+          <div class="t1">Análise Automática</div>
+          <div class="t2">Insights gerados a partir dos seus dados reais</div>
+        </div>
+      </div>
+      <div class="insights-list" id="insightsList"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ── Indicadores Principais (totais por canal) ── -->
+    <div class="section-label">Indicadores Principais · totais do período</div>
+    <div class="score-grid" id="scoreGrid"></div>
+
+    <div class="divider"></div>
+
+    <!-- ── Detalhamento Semanal (expansível) ── -->
+    <div class="section-label-row">
+      <div class="section-label">Detalhamento Semanal</div>
+      <button class="table-toggle" id="tableToggle" onclick="toggleTable()">
+        <span class="toggle-icon">▼</span>
+        <span class="toggle-text">Expandir</span>
+      </button>
+    </div>
+    <div class="table-container" id="tableContainer" style="display:none">
+      <div class="wtable-wrap">
+        <table class="wtable" id="weekTable"></table>
+      </div>
+    </div>
+
+    <!-- ── Destaques por Canal ── -->
+    <div id="destaques-section" style="display:none">
+      <div class="divider"></div>
+      <div class="section-label">Destaques por Canal</div>
+      <div class="destaques-grid" id="destaquesGrid"></div>
     </div>
 
   </div><!-- /#dash -->
@@ -726,10 +796,11 @@ const SHEET_ID = '1RuTUcnxjWmAkXYtCQSLRX3pLdLo6H1qsTskGdQTrTeU';
 
 /* ── CRM — planilha separada (somente leitura) ──────────────── */
 const CRM_SHEET_ID = '18OD1mDoDd4JMtYOvonqdGj18HxmWrCvRStn2Yh-p9F0';
+/* CRM contabilizado de Maio/2026 em diante — quando a Renata padronizou a
+   metodologia (tag "agendamento concluído"). Meses anteriores usavam outra
+   convenção e foram desconsiderados a pedido. Adicionar novos meses aqui. */
 const CRM_TABS = [
-  'Setembro 2025','Outubro 2025','Novembro 2025','Dezembro 2025',
-  'Janeiro 2026','fevereiro 2026','3 Março 2026',
-  'Abril 2026','1 Maio 2026','Junho 2026',
+  'Maio 2026','Junho 2026','Julho 26',
 ];
 
 /* ── CANAIS ──────────────────────────────────────────────────── */
@@ -788,7 +859,7 @@ const CHANNELS = [
 
 /* ── ALIASES DE COLUNAS — adicione variações se necessário ───── */
 const ALIASES = {
-  date:        ['data','date','mes','mes_ano','periodo','period','week','semana','month','dia','competencia'],
+  date:        ['data_inicio','data','date','mes','mes_ano','periodo','period','week','semana','month','dia','competencia'],
   followers:   ['seguidores','followers','inscritos','subscribers','assinantes','fans','seguidores_total','total_seguidores','cliques_totais','cliques'],
   reach:       ['alcance','reach','alcance_total','total_reach','pessoas_alcancadas','unique_reach','alcance_organico'],
   impressions: ['impressoes','impressions','views','visualizacoes','exibicoes','total_impressoes','total_impressions','impressao'],
@@ -850,7 +921,10 @@ function findCol(headers, aliases) {
   }
   for (const a of aliases) {
     const n = norm(a);
-    const found = headers.find(h => h.includes(n)||n.includes(h));
+    /* ignora colunas-lixo: o gviz rotula colunas vazias com a letra da
+       coluna (k, l, …, z, aa), que casariam por substring (ex: "ctr".includes("r")).
+       Exige header com ≥3 chars para o casamento parcial. */
+    const found = headers.find(h => h.length >= 3 && (h.includes(n) || n.includes(h)));
     if (found) return found;
   }
   return null;
@@ -884,6 +958,28 @@ function parseGviz(data) {
   }).filter(r => Object.values(r).some(v => v !== null && v !== '' && v !== undefined));
 
   return { heads, rows };
+}
+
+/* Converte resposta gviz (headers=0) num grid bruto: array de linhas,
+   cada linha é um array posicional de valores de célula (datas viram texto). */
+function parseGvizGrid(data) {
+  const table = data.table;
+  if (!table || !table.cols) throw new Error('gviz sem tabela');
+  const nc = table.cols.length;
+  return (table.rows || []).map(r => {
+    const arr = [];
+    for (let i = 0; i < nc; i++) {
+      const cell = (r.c || [])[i];
+      if (!cell || cell.v === null || cell.v === undefined) { arr.push(''); continue; }
+      const v = cell.v;
+      if (typeof v === 'string' && v.startsWith('Date(')) {
+        arr.push(cell.f || v.replace(/Date\((\d+),(\d+),(\d+).*/, (m,y,mo,d) => `${+d}/${+mo+1}/${y}`));
+      } else {
+        arr.push(v);
+      }
+    }
+    return arr;
+  });
 }
 
 function processChannel(parsed, cfg) {
@@ -1089,11 +1185,11 @@ function applyFilter() {
     DATA[id] = processChannel(workParsed, cfg);
   }
 
-  renderKPIs();
-  renderCharts();
   renderInsights();
+  renderScorecards();
+  renderTable();
   renderDestaques();
-  renderCRM();
+  /* CRM não depende do filtro de data — é agrupado por mês/aba (seletor próprio) */
 }
 
 
@@ -1137,10 +1233,11 @@ async function loadAll() {
     return;
   }
 
-  renderKPIs();
-  renderCharts();
   renderInsights();
+  renderScorecards();
+  renderTable();
   renderDestaques();
+  initCRMMonthPicker();
   renderCRM();
   document.getElementById('lastUpdate').textContent =
     new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1208,44 +1305,25 @@ function renderKPIs() {
 }
 
 
-/* ── Helpers Chart.js ───────────────────────────────────────── */
-function rgba(hex, a) {
-  const [r,g,b] = [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-const FONT = { family:"'Inter', sans-serif" };
-
-/* ── Theme helpers ─────────────────────────────────────────────── */
-function isLight() { return document.body.classList.contains('light'); }
-
-function themeTokens() {
-  return isLight()
-    ? { bg:'#ffffff', surface:'#f4f4f5', border:'#e4e4e7', text1:'#09090b', text2:'#52525b', text3:'#a1a1aa' }
-    : { bg:'#0f0f12', surface:'#1a1a1e', border:'#27272a', text1:'#fafafa', text2:'#a1a1aa', text3:'#52525b' };
-}
-
-function getTooltipBase() {
-  const t = themeTokens();
-  return {
-    backgroundColor: t.bg,
-    titleFont: {...FONT, size:12, weight:'600'},
-    bodyFont:  {...FONT, size:11},
-    borderColor: t.border,
-    borderWidth: 1,
-    padding: 12, cornerRadius: 8, caretSize: 4,
-    titleColor: t.text1,
-    bodyColor:  t.text2,
-  };
-}
-function getTick()  { const t = themeTokens(); return { font:{...FONT,size:11}, color:t.text3 }; }
-function getGridY() { const t = themeTokens(); return { color:t.surface, drawBorder:false }; }
-
 function toggleTheme() {
   const isNowLight = document.body.classList.toggle('light');
   localStorage.setItem('dash-theme', isNowLight ? 'light' : 'dark');
-  // Re-render charts with new palette
-  if (Object.keys(DATA).length) renderCharts();
+}
+
+function toggleTable() {
+  const container = document.getElementById('tableContainer');
+  const button = document.getElementById('tableToggle');
+  const isExpanded = container.classList.contains('expanded');
+
+  if (isExpanded) {
+    container.classList.remove('expanded');
+    button.classList.remove('expanded');
+    button.querySelector('.toggle-text').textContent = 'Expandir';
+  } else {
+    container.classList.add('expanded');
+    button.classList.add('expanded');
+    button.querySelector('.toggle-text').textContent = 'Colapsar';
+  }
 }
 
 // Apply saved theme before first render
@@ -1255,201 +1333,91 @@ function toggleTheme() {
   if (preferLight) document.body.classList.add('light');
 })();
 
-function killChart(id) {
-  if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; }
-}
-
-function renderCharts() {
-  renderGrowth();
-  renderImpressions();
-  renderCTR();
-  renderReach();
-}
-
-
-/* ── 1. Linha — crescimento ─────────────────────────────────── */
-function renderGrowth() {
-  killChart('g');
-
-  const allDates = new Set();
-  Object.values(DATA).forEach(ch =>
-    ch.rows.forEach(r => { if(r.date) allDates.add(r.date.toISOString().slice(0,10)); })
-  );
-  const dates = [...allDates].sort();
-  const hasDates = dates.length > 0;
-
-  const datasets = Object.values(DATA)
-    .filter(ch => ch.rows.some(r=>r.followers!==null))
-    .map(ch => {
-      let d;
-      if (hasDates) {
-        const map = {};
-        ch.rows.forEach(r => { if(r.date&&r.followers!==null) map[r.date.toISOString().slice(0,10)]=r.followers; });
-        d = dates.map(dt => map[dt]??null);
-      } else {
-        d = ch.rows.filter(r=>r.followers!==null).map(r=>r.followers);
-      }
-      return {
-        label: ch.cfg.name, data: d,
-        borderColor: ch.cfg.color,
-        backgroundColor: rgba(ch.cfg.color, .07),
-        fill: true, tension: .4,
-        borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6,
-        pointBackgroundColor: ch.cfg.color,
-      };
-    });
-
-  if (!datasets.length) return;
-
-  const labels = hasDates
-    ? dates.map(d => new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{month:'short',day:'numeric'}))
-    : datasets[0].data.map((_,i)=>`Período ${i+1}`);
-
-  CHARTS.g = new Chart(document.getElementById('cGrowth').getContext('2d'), {
-    type:'line',
-    data:{ labels, datasets },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{ position:'bottom', labels:{...FONT,usePointStyle:true,pointStyle:'circle',padding:16,font:{...FONT,size:11},color:themeTokens().text2} },
-        tooltip:{ ...getTooltipBase(), callbacks:{ label: c=>` ${c.dataset.label}: ${fmtN(c.raw)}` } },
-      },
-      scales:{
-        x:{ grid:{display:false}, border:{display:false}, ticks:getTick() },
-        y:{ grid:getGridY(), border:{display:false}, ticks:{...getTick(), callback:v=>fmtK(v)} },
-      },
-    },
-  });
-}
-
-
-/* ── 2. Barras — impressões ─────────────────────────────────── */
-function renderImpressions() {
-  killChart('i');
-  /* impressions = métrica nativa; fallback = alcance para canais sem impressões (ex: Instagram) */
-  const chs = Object.values(DATA).map(c => ({
-    ...c, _imp: c.totals.impressions > 0 ? c.totals.impressions : c.totals.reach
-  })).filter(c => c._imp > 0);
-  if (!chs.length) return;
-
-  CHARTS.i = new Chart(document.getElementById('cImpressions').getContext('2d'), {
-    type:'bar',
-    data:{
-      labels: chs.map(c=>c.cfg.name),
-      datasets:[{
-        label:'Impressões / Alcance',
-        data: chs.map(c=>c._imp),
-        backgroundColor: chs.map(c=>rgba(c.cfg.color,.82)),
-        borderWidth:0, borderRadius:8, borderSkipped:false,
-      }],
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{ ...getTooltipBase(), callbacks:{ label:(c,i)=>{
-          const ch = chs[c.dataIndex];
-          const label = ch.totals.impressions>0 ? 'impressões' : 'alcance';
-          return ` ${fmtK(c.raw)} ${label}`;
-        }}},
-      },
-      scales:{
-        x:{ grid:{display:false}, border:{display:false}, ticks:getTick() },
-        y:{ grid:getGridY(), border:{display:false}, ticks:{...getTick(), callback:v=>fmtK(v)} },
-      },
-    },
-  });
-}
-
-
-/* ── 3. Barras — CTR ────────────────────────────────────────── */
-function renderCTR() {
-  killChart('c');
-  const chs = Object.values(DATA).filter(c=>c.avgCTR!==null);
-  if (!chs.length) return;
-
-  CHARTS.c = new Chart(document.getElementById('cCTR').getContext('2d'), {
-    type:'bar',
-    data:{
-      labels: chs.map(c=>c.cfg.name),
-      datasets:[{
-        label:'CTR (%)',
-        data: chs.map(c=>c.avgCTR),
-        backgroundColor: chs.map(c=>rgba(c.cfg.color,.82)),
-        borderWidth:0, borderRadius:8, borderSkipped:false,
-      }],
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{ ...getTooltipBase(), callbacks:{ label:c=>` CTR: ${fmtPct(c.raw)}` } },
-      },
-      scales:{
-        x:{ grid:{display:false}, border:{display:false}, ticks:getTick() },
-        y:{ grid:getGridY(), border:{display:false}, ticks:{...getTick(), callback:v=>v.toFixed(1)+'%'} },
-      },
-    },
-  });
-}
-
-
-/* ── 4. Rosca — alcance ─────────────────────────────────────── */
-function renderReach() {
-  killChart('r');
-  /* reach = alcance direto; fallback = impressões para canais sem coluna Alcance */
-  const all = Object.values(DATA).map(c => ({
-    ...c, _vis: c.totals.reach > 0 ? c.totals.reach : c.totals.impressions
-  }));
-  const chs     = all.filter(c => c._vis > 0);
-  const missing = all.filter(c => c._vis === 0);
-
-  /* nota sobre canais sem dados */
-  const noteEl = document.getElementById('reachMissing');
-  if (noteEl) {
-    if (missing.length) {
-      const t = themeTokens();
-      noteEl.style.display = 'block';
-      noteEl.innerHTML = missing.map(c => `
-        <span style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 6px 0;font-size:11px;color:${t.text3}">
-          <span>${c.cfg.icon}</span>
-          <span>${c.cfg.name}</span>
-          <span style="font-size:10px;background:${t.surface};border:1px solid ${t.border};border-radius:3px;padding:1px 5px">sem dados</span>
-        </span>`).join('');
-    } else {
-      noteEl.style.display = 'none';
+/* ── Scorecards de totais do período ────────────────────────── */
+function renderScorecards() {
+  const grid = document.getElementById('scoreGrid');
+  if (!grid) return;
+  const cards = [];
+  const card = (ico, label, val, fmt, sub, deltaAbs) => {
+    if (val == null || (typeof val === 'number' && isNaN(val))) return;
+    let deltaHtml = '';
+    if (deltaAbs != null && deltaAbs !== 0) {
+      const up = deltaAbs > 0;
+      deltaHtml = `<div><span class="score-delta ${up?'up':'down'}">${up?'\u25b2':'\u25bc'} ${up?'+':''}${fmtN(deltaAbs)}</span></div>`;
     }
-  }
+    cards.push(`
+      <div class="score-card">
+        <div class="score-label">${ico} ${label}</div>
+        <div class="score-val">${fmt(val)}</div>
+        ${deltaHtml}
+        ${sub ? `<div class="score-sub">${sub}</div>` : ''}
+      </div>`);
+  };
 
-  if (!chs.length) return;
-
-  CHARTS.r = new Chart(document.getElementById('cReach').getContext('2d'), {
-    type:'doughnut',
-    data:{
-      labels: chs.map(c=>c.cfg.name),
-      datasets:[{
-        data: chs.map(c=>c._vis),
-        backgroundColor: chs.map(c=>rgba(c.cfg.color,.88)),
-        borderColor: chs.map(c=>c.cfg.color),
-        borderWidth:2, hoverOffset:8,
-      }],
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false, cutout:'64%',
-      plugins:{
-        legend:{ position:'bottom', labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{...FONT,size:11},color:themeTokens().text2} },
-        tooltip:{
-          ...getTooltipBase(),
-          callbacks:{
-            label: c => {
-              const total = c.dataset.data.reduce((a,b)=>a+b,0);
-              return ` ${fmtK(c.raw)} (${((c.raw/total)*100).toFixed(1)}%)`;
-            },
-          },
-        },
-      },
-    },
+  Object.values(DATA).forEach(ch => {
+    const c = ch.cfg, t = ch.totals;
+    if (c.id === 'gsc') {
+      card('\ud83d\udd0d', 'Cliques \u00b7 Google', t.clicks, fmtN, 'Visitas org\u00e2nicas no per\u00edodo');
+      card('\ud83d\udd0e', 'Impress\u00f5es \u00b7 Google', t.impressions, fmtN, 'Apari\u00e7\u00f5es na busca');
+    } else if (c.id === 'google_ads') {
+      if (t.clicks > 0)      card('\ud83c\udfaf', 'Cliques \u00b7 Ads', t.clicks, fmtN, 'Cliques em an\u00fancios');
+      if (t.investment > 0)  card('\ud83d\udcb0', 'Investimento \u00b7 Ads', t.investment, fmtBRL, 'Total gasto no per\u00edodo');
+      if (t.conversions > 0) card('\u2705', 'Convers\u00f5es \u00b7 Ads', t.conversions, fmtN, 'Resultados de campanhas');
+    } else if (c.id === 'youtube') {
+      card('\u25b6\ufe0f', 'Inscritos \u00b7 YouTube', ch.latestFollowers, fmtK, 'Total ao fim do per\u00edodo', ch.growthAbs);
+    } else {
+      /* redes sociais: alcance/impress\u00f5es n\u00e3o se somam (a mesma pessoa \u00e9 contada
+         a cada semana). Mostramos o MELHOR resultado do per\u00edodo \u2014 a semana de pico. */
+      const bestReach = Math.max(0, ...ch.rows.map(r => r.reach || 0));
+      const bestImpr  = Math.max(0, ...ch.rows.map(r => r.impressions || 0));
+      if (bestReach > 0) card(c.icon, `Melhor alcance \u00b7 ${c.name}`, bestReach, fmtK, 'Maior alcance numa semana do per\u00edodo');
+      if (bestImpr > 0)  card('\ud83d\udc41\ufe0f', `Melhores impress\u00f5es \u00b7 ${c.name}`, bestImpr, fmtK, 'Maior valor numa semana do per\u00edodo');
+      card('\u2795', `Seguidores \u00b7 ${c.name}`, ch.latestFollowers, fmtK, 'Total ao fim do per\u00edodo', ch.growthAbs);
+    }
   });
+
+  grid.innerHTML = cards.join('') || '<div class="state-sub">Sem dados no per\u00edodo.</div>';
+}
+
+/* ── Tabela de detalhamento semanal ─────────────────────────── */
+function renderTable() {
+  const table = document.getElementById('weekTable');
+  if (!table) return;
+  const ig = DATA.instagram, gsc = DATA.gsc, yt = DATA.youtube, ads = DATA.google_ads;
+  const byWeek = {};
+  const key = (d) => (d instanceof Date && !isNaN(d)) ? d.toISOString().slice(0,10) : null;
+  const put = (ch, mapFn) => (ch?.rows||[]).forEach(r => {
+    const k = key(r.date); if (!k) return;
+    byWeek[k] = byWeek[k] || {}; mapFn(byWeek[k], r);
+  });
+  put(ig,  (o,r)=>{ o.igSeg=r.followers; o.igAlc=r.reach; });
+  put(gsc, (o,r)=>{ o.gscClk=r.clicks; o.gscImp=r.impressions; });
+  put(yt,  (o,r)=>{ o.ytSub=r.followers; });
+  put(ads, (o,r)=>{ o.adsClk=r.clicks; o.adsInv=r.investment; });
+
+  const weeks = Object.keys(byWeek).sort().reverse();
+  const cell = (v, fmt) => (v==null||v==='') ? '<td class="muted">\u2014</td>' : `<td class="num">${fmt(v)}</td>`;
+  const fmtWeek = (k) => { const [y,m,d]=k.split('-'); return `${d}/${m}`; };
+
+  /* colunas poss\u00edveis \u2014 s\u00f3 renderiza as que t\u00eam ao menos 1 valor no per\u00edodo
+     (canais sem dados, como Google Ads, somem da tabela automaticamente) */
+  const COLS = [
+    { key:'igSeg',  label:'Seg. IG',        fmt:fmtN   },
+    { key:'igAlc',  label:'Alcance IG',     fmt:fmtN   },
+    { key:'gscClk', label:'Cliques Google', fmt:fmtN   },
+    { key:'gscImp', label:'Impr. Google',   fmt:fmtN   },
+    { key:'ytSub',  label:'Inscritos YT',   fmt:fmtN   },
+    { key:'adsClk', label:'Cliques Ads',    fmt:fmtN   },
+    { key:'adsInv', label:'Invest. Ads',    fmt:fmtBRL },
+  ].filter(c => weeks.some(k => byWeek[k][c.key] != null && byWeek[k][c.key] !== ''));
+
+  const head = `<thead><tr><th>Semana</th>${COLS.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>`;
+  const body = weeks.map(k =>
+    `<tr><td>${fmtWeek(k)}</td>${COLS.map(c => cell(byWeek[k][c.key], c.fmt)).join('')}</tr>`
+  ).join('');
+  const colspan = COLS.length + 1;
+
+  table.innerHTML = head + `<tbody>${body || `<tr><td colspan="${colspan}" class="muted">Sem dados no per\u00edodo.</td></tr>`}</tbody>`;
 }
 
 
@@ -1552,7 +1520,7 @@ async function fetchDestaques() {
 }
 
 /** Retorna linhas da aba Destaques filtradas pelo intervalo de datas selecionado */
-function getFilteredDestaques() {
+function getFilteredDestaques(ignoreDate = false) {
   if (!DESTAQUES_RAW) return [];
 
   const h = DESTAQUES_RAW.heads;
@@ -1572,6 +1540,7 @@ function getFilteredDestaques() {
 
   return DESTAQUES_RAW.rows
     .filter(row => {
+      if (ignoreDate) return true;
       if (!from && !to) return true;
       if (!colData) return true;
       const d = row[colData];
@@ -1600,17 +1569,21 @@ function renderDestaques() {
 
   if (!DESTAQUES_RAW) { section.style.display = 'none'; return; }
 
-  const rows = getFilteredDestaques();
+  const rows    = getFilteredDestaques();
+  const allRows = getFilteredDestaques(true); // ignora data — fallback histórico
   section.style.display = 'block';
   grid.innerHTML = '';
 
+  const matchesChannel = (r, ch) =>
+    r.canal === ch.id ||
+    r.canal.includes(ch.id.slice(0,4)) ||            // "inst" → instagram
+    (ch.id === 'gsc' && (r.canal.includes('gsc') || r.canal.includes('google')));
+
   DESTAQUE_CHANNELS.forEach(ch => {
-    /* entre as linhas do período, pega a de maior valor para este canal */
-    const channelRows = rows.filter(r =>
-      r.canal === ch.id ||
-      r.canal.includes(ch.id.slice(0,4)) ||          // "inst" → instagram
-      (ch.id === 'gsc' && (r.canal.includes('gsc') || r.canal.includes('google')))
-    );
+    /* entre as linhas do período, pega a de maior valor para este canal;
+       se o período não tiver destaque, cai no melhor histórico do canal */
+    let channelRows = rows.filter(r => matchesChannel(r, ch));
+    if (!channelRows.length) channelRows = allRows.filter(r => matchesChannel(r, ch));
     const best = channelRows.length
       ? [...channelRows].sort((a,b) => (b.valor||0) - (a.valor||0))[0]
       : null;
@@ -1671,7 +1644,21 @@ function renderDestaques() {
      - Nova   (Mar+):    STATUS|Nome|Telefone|Origem|Cidade|Data|…
    ═══════════════════════════════════════════════════════════════ */
 
+/* Abas que usam o parser robusto de grid (multi-seção, cabeçalho variável).
+   Apenas Maio e Junho — os demais meses continuam no parser original. */
+const CRM_GRID_TABS = new Set(['Março 2026', 'Abril 2026', 'Maio 2026', 'Junho 2026', 'Julho 26']);
+
+/* Fetch padrão (parser original): pula linha 1 (título), cabeçalho na linha 2 */
 function fetchCRMSheet(tabName) {
+  return crmJsonp(tabName, 'A2:J', 1, parseGviz);
+}
+
+/* Fetch robusto p/ Maio/Junho: grid bruto, o parser detecta cabeçalho/seções */
+function fetchCRMGrid(tabName) {
+  return crmJsonp(tabName, 'A:N', 0, parseGvizGrid);
+}
+
+function crmJsonp(tabName, range, headers, parseFn) {
   return new Promise((resolve, reject) => {
     const cb = 'crmCb' + Date.now() + Math.floor(Math.random() * 99999);
     const timer = setTimeout(() => {
@@ -1682,27 +1669,50 @@ function fetchCRMSheet(tabName) {
     window[cb] = function(data) {
       clearTimeout(timer); delete window[cb]; document.getElementById(cb)?.remove();
       if (!data || data.status === 'error') { reject(new Error('gviz err: ' + tabName)); return; }
-      try { resolve(parseGviz(data)); } catch(e) { reject(e); }
+      try { resolve(parseFn(data)); } catch(e) { reject(e); }
     };
 
     const script = document.createElement('script');
     script.id  = cb;
-    /* range=A2:J → pula linha 1 (título mesclado), usa linha 2 como cabeçalho */
     script.src = 'https://docs.google.com/spreadsheets/d/' + CRM_SHEET_ID +
                  '/gviz/tq?tqx=out:json;responseHandler:' + cb +
                  '&sheet=' + encodeURIComponent(tabName) +
-                 '&range=A2:J&headers=1&_nc=' + Date.now();
+                 '&range=' + range + '&headers=' + headers + '&_nc=' + Date.now();
     script.onerror = () => { clearTimeout(timer); delete window[cb]; script.remove(); reject(new Error('err: ' + tabName)); };
     document.head.appendChild(script);
   });
 }
 
 async function fetchCRM() {
+  const results = await Promise.allSettled(CRM_TABS.map(tab =>
+    CRM_GRID_TABS.has(tab) ? fetchCRMGrid(tab) : fetchCRMSheet(tab)
+  ));
+
+  /* Cada lead é etiquetado com a ABA de origem (o mês em que a Renata o arquivou).
+     O agrupamento do CRM passa a ser por aba — bate com a fonte de verdade e fica
+     imune a typo de data. A dedupe é feita DENTRO de cada aba (mesmo lead repetido
+     em duas seções da mesma aba conta uma vez), mas NÃO entre abas (um lead que
+     aparece na aba de maio e na de junho conta nas duas). */
   CRM_RAW = [];
-  const results = await Promise.allSettled(CRM_TABS.map(tab => fetchCRMSheet(tab)));
-  results.forEach(res => {
-    if (res.status === 'fulfilled') CRM_RAW.push(...parseCRMRows(res.value));
+  const ordem = {};  // aba → índice, para ordenar
+  results.forEach((res, i) => {
+    if (res.status !== 'fulfilled') return;
+    const tab = CRM_TABS[i];
+    ordem[tab] = i;
+    let leads = CRM_GRID_TABS.has(tab) ? parseCRMGrid(res.value) : parseCRMRows(res.value);
+
+    const seen = new Set();
+    leads = leads.filter(l => {
+      const tel = (l.telefone || '').replace(/\D/g, '');
+      const key = tel.length >= 8 ? 'tel:' + tel
+                : 'nm:' + (l.nome || '').toLowerCase().trim() + '|' + (l.date ? l.date.getTime() : '');
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    leads.forEach(l => { l.aba = tab; l.abaIdx = i; });
+    CRM_RAW.push(...leads);
   });
+
   CRM_RAW.sort((a,b) => (!a.date ? 1 : !b.date ? -1 : a.date - b.date));
 }
 
@@ -1722,7 +1732,9 @@ function normCRMStatus(raw, isNew) {
   const s = String(raw).trim().toUpperCase()
     .normalize('NFD').replace(/[̀-ͯ]/g,'');
   if (!isNew) return (s === 'SIM' ? 'Finalizado' : 'Não convertido');
-  if (s.startsWith('AGEN')) return 'Agendado';
+  /* "agendamento concluído" = única tag que conta como conversão real */
+  if (s.includes('AGENDAMENTO') && s.includes('CONCLU')) return 'Agendamento concluído';
+  if (s.startsWith('AGEN')) return 'Agendado';  // agendamentos pendentes (não é conversão)
   if (s.startsWith('DECL')) return 'Declinado';
   if (s.startsWith('FOLL')) return 'Follow';
   if (s.startsWith('FINAL')) return 'Finalizado';
@@ -1742,43 +1754,203 @@ function normCRMOrigem(raw) {
   return String(raw).trim();
 }
 
+/* Normaliza o campo "Plano de saúde?" → nome do convênio, ou null se não tem */
+function normCRMConvenio(raw) {
+  if (!raw) return null;
+  // remove prefixo "Sim", "Sim -", "Sim," → sobra a operadora (se houver)
+  let txt = String(raw).trim().replace(/^sim\b[\s,;:.\-]*/i, '').trim();
+  const s = txt.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+
+  // valores que NÃO são operadora (sem convênio, notas ou status vazado de outras colunas)
+  const naoConv = new Set(['','-','--','nao','n','nenhum','sem','particular','null','na','n/d',
+    'agendado','em andamento','em atendimento','finalizado','follow','declinado','reagendar',
+    'nao citado','nao informado','nao reembolsa','reembolsa','sim','x']);
+  if (naoConv.has(s) || s.startsWith('nao ') || s.startsWith('particular') ||
+      s.startsWith('esta mudando') || s.startsWith('servidora') || s.startsWith('de servidora'))
+    return null;
+
+  // agrupa operadoras conhecidas (cobre variantes de grafia)
+  if (s.includes('unimed'))                                  return 'Unimed';
+  if (s.includes('sul america') || s.includes('sulamerica')) return 'SulAmérica';
+  if (s.includes('porto'))                                   return 'Porto Seguro';
+  if (s.includes('bradesco'))                                return 'Bradesco';
+  if (s.includes('notre'))                                   return 'NotreDame';
+  if (s.includes('amil'))                                    return 'Amil';
+  if (s.includes('prevent'))                                 return 'Prevent Senior';
+  if (s.includes('med senior') || s.includes('medsenior'))   return 'Med Senior';
+  if (s.includes('hap'))                                     return 'Hapvida';
+  if (s.includes('care plus') || s.includes('careplus') || s.includes('care +')) return 'Care Plus';
+  if (s.includes('intermedica'))                             return 'Intermédica';
+  if (s.includes('biovida'))                                 return 'Biovida Saúde';
+  if (s.includes('golden'))                                  return 'Golden Cross';
+  if (s.includes('omint'))                                   return 'Omint';
+  if (s.includes('sompo'))                                   return 'Sompo';
+  if (s.includes('geap'))                                    return 'GEAP';
+  if (s.includes('iamspe'))                                  return 'IAMSPE';
+  if (s.includes('sao francisco'))                           return 'São Francisco';
+  if (s.includes('sao cristovao'))                           return 'São Cristóvão';
+  if (s.includes('sao bernardo'))                            return 'São Bernardo';
+  if (s.includes('santa casa'))                              return 'Santa Casa';
+  if (s.includes('trasmontano'))                             return 'Trasmontano';
+  if (s.includes('correios') || s.includes('portal saude'))  return 'Portal Saúde';
+  if (s.includes('alice'))                                   return 'Alice';
+  if (s.includes('medservice'))                              return 'Medservice';
+  if (s.includes('sistema saude'))                           return 'Sistema Saúde';
+  if (s.includes('geap'))                                    return 'GEAP';
+  if (s.includes('unica'))                                   return 'Única';
+  if (s.includes('iamspe') || s.includes('cbpm') || s.includes('caixa')) return 'Outros (servidor público)';
+
+  // fallback: Title Case seguro (não quebra em letras acentuadas)
+  return txt.toLowerCase().replace(/(^|\s)([a-zà-ÿ])/g, (m,p,c) => p + c.toUpperCase());
+}
+
+/* Parser ORIGINAL (demais meses): cabeçalho único vindo do gviz (headers=1). */
 function parseCRMRows({ heads, rows }) {
   if (!heads || !rows) return [];
   const isNew = heads[0] === 'status';
   const result = [];
   for (const r of rows) {
-    // pula linhas de cabeçalho repetidas (ex: Maio 2026 tem 2 seções)
+    // pula linhas de cabeçalho repetidas
     const a0 = String(r[heads[0]] || '').trim();
     if (a0 === 'STATUS' || a0 === 'Nome' || a0 === 'status' || a0 === 'nome') continue;
-    // pula linhas sem nome nem origem
     const nome   = isNew ? (r['nome']||'') : (r[heads[0]]||'');
     const origem = isNew ? (r['origem']||r['origem_']||'') : (r['origem']||'');
     if (!nome && !origem) continue;
 
     const rawDate   = r['data_contato'] || r['data'] || null;
     const rawStatus = isNew ? (r['status']||'') : (r['fechou']||r['fechou_']||'');
+    const rawConv   = r['plano_de_saude'] || r['plano_de_saude_'] || r['convenio'] || null;
 
     result.push({
-      nome:   String(nome).trim(),
-      origem: normCRMOrigem(String(origem).trim()),
-      status: normCRMStatus(String(rawStatus).trim(), isNew),
-      date:   parseCRMDate(rawDate),
+      nome:     String(nome).trim(),
+      origem:   normCRMOrigem(String(origem).trim()),
+      status:   normCRMStatus(String(rawStatus).trim(), isNew),
+      convenio: normCRMConvenio(rawConv),
+      date:     parseCRMDate(rawDate),
     });
   }
   return result;
 }
 
-function getFilteredCRM() {
-  const fromVal = document.getElementById('filterFrom')?.value;
-  const toVal   = document.getElementById('filterTo')?.value;
-  const from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
-  const to   = toVal   ? new Date(toVal   + 'T23:59:59') : null;
-  return CRM_RAW.filter(r => {
-    if (!r.date) return true; // sem data: inclui sempre
-    if (from && r.date < from) return false;
-    if (to   && r.date > to)   return false;
-    return true;
-  });
+/* Parser robusto de grid de CRM — usado APENAS em Maio/Junho.
+   Lida com abas de estruturas variadas:
+     - cabeçalho na linha 1 ou na linha 2 (após título mesclado)
+     - múltiplas seções com cabeçalhos repetidos (ex: "Maio 2026")
+     - com coluna STATUS (formato novo) ou sem (formato antigo, usa "Fechou?")
+   Detecta cabeçalhos linha a linha e aplica o mapa de colunas vigente. */
+function parseCRMGrid(grid) {
+  if (!grid || !grid.length) return [];
+  const result = [];
+  let map = null;
+
+  const cellStr   = c => String(c == null ? '' : c).trim();
+  const normCell  = c => norm(cellStr(c));
+  const isHeader  = (cells) => {
+    const n = cells.map(normCell);
+    return n.includes('nome') || (n.includes('status') && n.includes('origem'));
+  };
+  const buildMap = (cells) => {
+    const n = cells.map(normCell);
+    const find = (al) => n.findIndex(x => al.includes(x));
+    const idxStatus = find(['status']);
+    /* formato NOVO (STATUS na col 0): layout posicional fixo.
+       Necessário porque alguns cabeçalhos têm Telefone/Data em branco e não
+       dá pra localizá-los por nome:
+       0=STATUS 1=Nome 2=Telefone 3=Origem 4=Cidade 5=Data 6=Motivo 7=Plano */
+    if (idxStatus === 0) {
+      return { idxNome:1, idxTel:2, idxStatus:0, idxFechou:-1, idxOrigem:3, idxData:5, idxConv:7, isNew:true };
+    }
+    /* formato ANTIGO: Nome|Telefone|Origem|Data|Fechou?|Motivo.
+       Usa o cabeçalho quando o rótulo existe; senão cai na posição padrão
+       (vários cabeçalhos têm Telefone/Data em branco). */
+    const at = (al, def) => { const i = find(al); return i >= 0 ? i : def; };
+    let idxData = find(['data_contato']); if (idxData < 0) idxData = find(['data']); if (idxData < 0) idxData = 3;
+    return {
+      idxNome:   at(['nome'], 0),
+      idxTel:    at(['telefone','telefone_','fone','whatsapp'], 1),
+      idxStatus: -1,
+      idxFechou: at(['fechou','fechou_'], 4),
+      idxOrigem: at(['origem'], 2),
+      idxData,
+      idxConv:   find(['plano_de_saude','plano_de_saude_','convenio']),
+      isNew:     false,
+    };
+  };
+  // mapa padrão (formato novo) — usado quando uma seção começa antes do cabeçalho
+  const DEFAULT_MAP = { idxNome:1, idxTel:2, idxStatus:0, idxFechou:-1, idxOrigem:3, idxData:5, idxConv:7, isNew:true };
+
+  let emFollow = false;  // dentro da seção "Follow - próximo mês"
+  for (const cells of grid) {
+    if (!cells.some(c => cellStr(c))) continue;           // linha vazia
+    /* seção "Follow - PRÓXIMO MÊS": os leads seguintes são o pipeline em
+       acompanhamento. Continuam CONTANDO como leads (total), mas são marcados
+       como "Follow" — não são conversão. Só o que muda é a etiqueta. */
+    if (norm(cells.map(c => cellStr(c)).join(' ')).includes('proximo_mes')) { emFollow = true; continue; }
+    if (isHeader(cells)) { map = buildMap(cells); continue; } // cabeçalho → atualiza mapa
+    const filled = cells.filter(c => cellStr(c)).length;
+    if (filled <= 1) continue;                            // título de seção (1 célula)
+
+    const m = map || DEFAULT_MAP;
+    const g = (i) => (i >= 0 && i < cells.length) ? cells[i] : '';
+    const nome   = cellStr(g(m.idxNome));
+    const origem = cellStr(g(m.idxOrigem));
+    const nn = norm(nome);
+    if (nn === 'nome' || nn === 'status') continue;       // cabeçalho repetido
+    if (/^(lead de |follow\s*-|proximo mes)/i.test(nome)) continue; // título caiu no nome
+    if (!nome && !origem) continue;
+
+    const rawStatus = m.isNew
+      ? cellStr(g(m.idxStatus))
+      : (m.idxFechou >= 0 ? cellStr(g(m.idxFechou)) : '');
+    let status = normCRMStatus(rawStatus, m.isNew);
+    /* na seção de follow, leads sem status são acompanhamento em andamento */
+    if (emFollow && status === 'Sem status') status = 'Follow';
+
+    result.push({
+      nome,
+      telefone: cellStr(g(m.idxTel)),
+      origem:   normCRMOrigem(origem),
+      status,
+      convenio: normCRMConvenio(g(m.idxConv)),
+      date:     parseCRMDate(g(m.idxData)),
+    });
+  }
+  return result;
+}
+
+/* Mês/aba selecionado no CRM ('todos' = carteira inteira).
+   O CRM é agrupado por ABA (mês em que a Renata arquivou o lead), independente
+   do filtro de data do topo — que continua valendo só para os dados de canais. */
+let CRM_SELECTED_TAB = 'todos';
+
+function getCRMLeads() {
+  if (CRM_SELECTED_TAB !== 'todos') return CRM_RAW.filter(l => l.aba === CRM_SELECTED_TAB);
+  /* "Todos os meses": deduplica por telefone entre abas, senão um lead que
+     aparece em duas abas (ex: contato em maio, follow em junho) conta 2x. */
+  const seen = new Set(); const out = [];
+  for (const l of CRM_RAW) {
+    const tel = (l.telefone || '').replace(/\D/g, '');
+    const key = tel.length >= 8 ? 'tel:' + tel
+              : 'nm:' + (l.nome || '').toLowerCase().trim() + '|' + (l.date ? l.date.getTime() : '');
+    if (seen.has(key)) continue;
+    seen.add(key); out.push(l);
+  }
+  return out;
+}
+
+/* Popula o seletor de mês a partir das abas que realmente têm leads,
+   da mais recente para a mais antiga. */
+function initCRMMonthPicker() {
+  const sel = document.getElementById('crmMonth');
+  if (!sel) return;
+  const abas = [...new Set(CRM_RAW.map(l => l.aba).filter(Boolean))]
+    .sort((a,b) => (CRM_RAW.find(l=>l.aba===b)?.abaIdx ?? 0) - (CRM_RAW.find(l=>l.aba===a)?.abaIdx ?? 0));
+  /* rótulo consistente: "Julho 26" → "Julho 2026" (o value continua o nome real da aba) */
+  const label = a => a.replace(/\s(\d{2})$/, ' 20$1');
+  sel.innerHTML = `<option value="todos">Todos os meses</option>` +
+    abas.map(a => `<option value="${a}">${label(a)}</option>`).join('');
+  sel.value = CRM_SELECTED_TAB;
+  sel.onchange = () => { CRM_SELECTED_TAB = sel.value; renderCRM(); };
 }
 
 function renderCRM() {
@@ -1787,29 +1959,46 @@ function renderCRM() {
   if (!CRM_RAW.length) { section.style.display = 'none'; return; }
   section.style.display = '';
 
-  const leads = getFilteredCRM();
+  const leads = getCRMLeads();
+  const escopo = CRM_SELECTED_TAB === 'todos' ? 'no total' : CRM_SELECTED_TAB.replace(/\s(\d{2})$/, ' 20$1');
 
-  /* ── KPIs ── */
+  /* ── KPIs ──
+     Conversão = APENAS leads com "agendamento concluído" (regra do cliente).
+     "Finalizado" no CRM da Renata são leads perdidos, não conta como conversão. */
   const total      = leads.length;
-  const convertidos = leads.filter(l => l.status === 'Finalizado' || l.status === 'Agendado').length;
+  const convertidos = leads.filter(l => l.status === 'Agendamento concluído').length;
   const taxa        = total > 0 ? (convertidos / total * 100) : 0;
+  const comConvenio = leads.filter(l => l.convenio).length;
+  const pctConvenio = total > 0 ? Math.round(comConvenio / total * 100) : 0;
 
   document.getElementById('crmKpis').innerHTML = `
     <div class="crm-kpi">
       <div class="crm-kpi-val">${total}</div>
       <div class="crm-kpi-label">Total de Leads</div>
-      <div class="crm-kpi-sub">contatos no período</div>
+      <div class="crm-kpi-sub">contatos ${escopo}</div>
     </div>
     <div class="crm-kpi">
       <div class="crm-kpi-val">${convertidos}</div>
       <div class="crm-kpi-label">Convertidos</div>
-      <div class="crm-kpi-sub">agendados ou finalizados</div>
+      <div class="crm-kpi-sub">com agendamento concluído</div>
     </div>
     <div class="crm-kpi">
       <div class="crm-kpi-val">${taxa.toFixed(0)}%</div>
       <div class="crm-kpi-label">Taxa de Conversão</div>
       <div class="crm-kpi-sub">sobre total de leads</div>
+    </div>
+    <div class="crm-kpi">
+      <div class="crm-kpi-val">${comConvenio}<span style="font-size:18px;color:var(--text-3);font-weight:600"> · ${pctConvenio}%</span></div>
+      <div class="crm-kpi-label">Com Convênio Médico</div>
+      <div class="crm-kpi-sub">leads com plano de saúde</div>
     </div>`;
+
+  /* Nota discreta: dos agendamentos concluídos, quantos vieram de indicação */
+  const convIndicacao = leads.filter(l => l.status === 'Agendamento concluído' && l.origem === 'Indicação').length;
+  const pctInd = convertidos > 0 ? Math.round(convIndicacao / convertidos * 100) : 0;
+  document.getElementById('crmIndicacaoNote').innerHTML = convertidos > 0
+    ? `Dos ${convertidos} agendamentos concluídos, <strong>${convIndicacao} (${pctInd}%)</strong> vieram de indicação.`
+    : '';
 
   /* ── Origem ── */
   const origemColors = {
@@ -1834,10 +2023,10 @@ function renderCRM() {
 
   /* ── Status ── */
   const statusColors = {
-    'Finalizado':'#22c55e','Agendado':'#3b82f6','Follow':'#f59e0b',
-    'Declinado':'#ef4444','Não convertido':'#71717a','Sem status':'#52525b',
+    'Agendamento concluído':'#22c55e','Agendado':'#3b82f6','Follow':'#f59e0b',
+    'Declinado':'#ef4444','Finalizado':'#a1a1aa','Não convertido':'#71717a','Sem status':'#52525b',
   };
-  const statusOrder = ['Finalizado','Agendado','Follow','Declinado','Não convertido','Sem status'];
+  const statusOrder = ['Agendamento concluído','Agendado','Follow','Declinado','Finalizado','Não convertido','Sem status'];
   const statusCount = {};
   leads.forEach(l => { statusCount[l.status] = (statusCount[l.status]||0) + 1; });
   const statusSorted = statusOrder
@@ -1856,6 +2045,42 @@ function renderCRM() {
           <div class="crm-bar-count">${count}</div>
         </div>`).join('')
     : '<div class="crm-empty">Sem dados no período</div>';
+
+  /* ── Convênios Médicos ── */
+  const convPalette = ['#10b981','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#ef4444','#84cc16','#f97316','#14b8a6'];
+  const convCount = {};
+  leads.forEach(l => { if (l.convenio) convCount[l.convenio] = (convCount[l.convenio]||0) + 1; });
+  const convSortedAll = Object.entries(convCount).sort((a,b) => b[1]-a[1]);
+
+  // mostra top 10; agrupa o restante como "Outros"
+  const TOP = 10;
+  let convSorted = convSortedAll;
+  if (convSortedAll.length > TOP) {
+    const head = convSortedAll.slice(0, TOP);
+    const restCount = convSortedAll.slice(TOP).reduce((s,[,c]) => s+c, 0);
+    convSorted = head.concat([[`Outros (${convSortedAll.length - TOP})`, restCount]]);
+  }
+  const convMax = convSorted[0]?.[1] || 1;
+
+  // Subtítulo: quantos têm convênio + % do total de leads
+  const subEl = document.getElementById('crmConvenioSub');
+  if (subEl) {
+    const pct = total > 0 ? Math.round(comConvenio / total * 100) : 0;
+    subEl.textContent = comConvenio > 0
+      ? `${comConvenio} de ${total} leads (${pct}%) têm plano de saúde · ${convSortedAll.length} operadoras`
+      : 'Leads com plano de saúde, por operadora';
+  }
+
+  document.getElementById('crmConvenioBars').innerHTML = convSorted.length
+    ? convSorted.map(([label,count],i) => `
+        <div class="crm-bar-row">
+          <div class="crm-bar-label" title="${label}">${label}</div>
+          <div class="crm-bar-track">
+            <div class="crm-bar-fill" style="width:${(count/convMax*100).toFixed(1)}%;background:${convPalette[i % convPalette.length]}"></div>
+          </div>
+          <div class="crm-bar-count">${count}</div>
+        </div>`).join('')
+    : '<div class="crm-empty">Nenhum convênio informado no período</div>';
 }
 
 
