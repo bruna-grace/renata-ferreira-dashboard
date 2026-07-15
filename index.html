@@ -795,12 +795,14 @@
 const SHEET_ID = '1RuTUcnxjWmAkXYtCQSLRX3pLdLo6H1qsTskGdQTrTeU';
 
 /* ── CRM — planilha separada (somente leitura) ──────────────── */
-const CRM_SHEET_ID = '18OD1mDoDd4JMtYOvonqdGj18HxmWrCvRStn2Yh-p9F0';
+const CRM_SHEET_ID = '1UnpShR1ydhFy-4dKDdQLJFSEjXxf1IKmQ_YmlSQxLcQ';  // planilha "CRM - Renata"
 /* CRM contabilizado de Maio/2026 em diante — quando a Renata padronizou a
    metodologia (tag "agendamento concluído"). Meses anteriores usavam outra
-   convenção e foram desconsiderados a pedido. Adicionar novos meses aqui. */
+   convenção e foram desconsiderados a pedido. Adicionar novos meses aqui.
+   Obs: a aba "FOLLOW MENSAL" é ignorada de propósito — os follow-ups já
+   aparecem dentro de cada mês pelo status "Follow" (evita duplicar leads). */
 const CRM_TABS = [
-  'Maio 2026','Junho 2026','Julho 26',
+  'MAIO 26','JUNHO 26','JULHO 26',
 ];
 
 /* ── CANAIS ──────────────────────────────────────────────────── */
@@ -1646,7 +1648,15 @@ function renderDestaques() {
 
 /* Abas que usam o parser robusto de grid (multi-seção, cabeçalho variável).
    Apenas Maio e Junho — os demais meses continuam no parser original. */
-const CRM_GRID_TABS = new Set(['Março 2026', 'Abril 2026', 'Maio 2026', 'Junho 2026', 'Julho 26']);
+const CRM_GRID_TABS = new Set(['MAIO 26', 'JUNHO 26', 'JULHO 26']);
+
+/* Rótulo amigável da aba-mês: "MAIO 26" → "Maio 2026" (Title Case + ano de 4 díg.) */
+function crmMonthLabel(a) {
+  return String(a || '')
+    .replace(/\s(\d{2})$/, ' 20$1')
+    .toLowerCase()
+    .replace(/(^|\s)([a-zà-ÿ])/g, (m, p, c) => p + c.toUpperCase());
+}
 
 /* Fetch padrão (parser original): pula linha 1 (título), cabeçalho na linha 2 */
 function fetchCRMSheet(tabName) {
@@ -1736,22 +1746,30 @@ function normCRMStatus(raw, isNew) {
   if (s.includes('AGENDAMENTO') && s.includes('CONCLU')) return 'Agendamento concluído';
   if (s.startsWith('AGEN')) return 'Agendado';  // agendamentos pendentes (não é conversão)
   if (s.startsWith('DECL')) return 'Declinado';
-  if (s.startsWith('FOLL')) return 'Follow';
+  if (s.startsWith('FOL'))  return 'Follow';  // pega "Follow", "Folow" (typo), "Follow Mensal"
   if (s.startsWith('FINAL')) return 'Finalizado';
-  return String(raw).trim() || 'Sem status';
+  if (s.startsWith('AGUARD')) return 'Aguardando retorno';
+  if (s.includes('NUNCA') && s.includes('RESPOND')) return 'Nunca respondeu';
+  if (s.includes('ATENDIMENTO') && s.includes('INICIA')) return 'Atendimento iniciado';
+  /* fallback: Title Case p/ não fragmentar status por caixa ("NUNCA" vs "Nunca") */
+  const t = String(raw).trim();
+  return t ? t.toLowerCase().replace(/(^|\s)([a-zà-ÿ])/g, (m,p,c) => p + c.toUpperCase()) : 'Sem status';
 }
 
 function normCRMOrigem(raw) {
   if (!raw || raw === '-' || raw === 'null') return 'Não informado';
   const s = String(raw).trim().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g,'');
-  if (s.includes('instagram')) return 'Instagram';
+  if (s.includes('instagram') || s.includes('intagram') || s.includes('instag')) return 'Instagram';
   if (s.includes('youtube'))   return 'YouTube';
   if (s.includes('google'))    return 'Google';
   if (s.includes('whatsapp') || s.startsWith('whats'))  return 'WhatsApp';
-  if (s.includes('indicac') || s.includes('dr.') || s.includes('dra.')) return 'Indicação';
+  if (s.includes('trafego') || s.includes('anuncio') || s.includes('ads')) return 'Tráfego';
+  if (s === 'site' || s.includes('site '))  return 'Site';
+  if (s.includes('indicac') || s.includes('indicou') || s.includes('dr.') || s.includes('dra.')) return 'Indicação';
   if (!s || s === 'nao informado' || s === 'nao_informado') return 'Não informado';
-  return String(raw).trim();
+  /* fallback: Title Case p/ não fragmentar por caixa ("TRÁFEGO" vs "Tráfego") */
+  return String(raw).trim().toLowerCase().replace(/(^|\s)([a-zà-ÿ])/g, (m,p,c) => p + c.toUpperCase());
 }
 
 /* Normaliza o campo "Plano de saúde?" → nome do convênio, ou null se não tem */
@@ -1945,10 +1963,9 @@ function initCRMMonthPicker() {
   if (!sel) return;
   const abas = [...new Set(CRM_RAW.map(l => l.aba).filter(Boolean))]
     .sort((a,b) => (CRM_RAW.find(l=>l.aba===b)?.abaIdx ?? 0) - (CRM_RAW.find(l=>l.aba===a)?.abaIdx ?? 0));
-  /* rótulo consistente: "Julho 26" → "Julho 2026" (o value continua o nome real da aba) */
-  const label = a => a.replace(/\s(\d{2})$/, ' 20$1');
+  /* rótulo consistente: "JULHO 26" → "Julho 2026" (o value continua o nome real da aba) */
   sel.innerHTML = `<option value="todos">Todos os meses</option>` +
-    abas.map(a => `<option value="${a}">${label(a)}</option>`).join('');
+    abas.map(a => `<option value="${a}">${crmMonthLabel(a)}</option>`).join('');
   sel.value = CRM_SELECTED_TAB;
   sel.onchange = () => { CRM_SELECTED_TAB = sel.value; renderCRM(); };
 }
@@ -1960,7 +1977,7 @@ function renderCRM() {
   section.style.display = '';
 
   const leads = getCRMLeads();
-  const escopo = CRM_SELECTED_TAB === 'todos' ? 'no total' : CRM_SELECTED_TAB.replace(/\s(\d{2})$/, ' 20$1');
+  const escopo = CRM_SELECTED_TAB === 'todos' ? 'no total' : crmMonthLabel(CRM_SELECTED_TAB);
 
   /* ── KPIs ──
      Conversão = APENAS leads com "agendamento concluído" (regra do cliente).
@@ -2023,10 +2040,11 @@ function renderCRM() {
 
   /* ── Status ── */
   const statusColors = {
-    'Agendamento concluído':'#22c55e','Agendado':'#3b82f6','Follow':'#f59e0b',
-    'Declinado':'#ef4444','Finalizado':'#a1a1aa','Não convertido':'#71717a','Sem status':'#52525b',
+    'Agendamento concluído':'#22c55e','Atendimento iniciado':'#14b8a6','Agendado':'#3b82f6','Follow':'#f59e0b',
+    'Aguardando retorno':'#eab308','Declinado':'#ef4444','Finalizado':'#a1a1aa','Nunca respondeu':'#78716c',
+    'Não convertido':'#71717a','Sem status':'#52525b',
   };
-  const statusOrder = ['Agendamento concluído','Agendado','Follow','Declinado','Finalizado','Não convertido','Sem status'];
+  const statusOrder = ['Agendamento concluído','Atendimento iniciado','Agendado','Follow','Aguardando retorno','Declinado','Finalizado','Nunca respondeu','Não convertido','Sem status'];
   const statusCount = {};
   leads.forEach(l => { statusCount[l.status] = (statusCount[l.status]||0) + 1; });
   const statusSorted = statusOrder
