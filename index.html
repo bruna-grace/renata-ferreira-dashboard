@@ -1664,9 +1664,11 @@ function renderDestaques() {
 
   DESTAQUE_CHANNELS.forEach(ch => {
     /* entre as linhas do período, pega a de maior valor para este canal;
-       se o período não tiver destaque, cai no melhor histórico do canal */
+       se o período não tiver destaque, cai no melhor histórico do canal
+       (marcado como "histórico" para não confundir com o período atual) */
     let channelRows = rows.filter(r => matchesChannel(r, ch));
-    if (!channelRows.length) channelRows = allRows.filter(r => matchesChannel(r, ch));
+    let isHist = false;
+    if (!channelRows.length) { channelRows = allRows.filter(r => matchesChannel(r, ch)); isHist = true; }
     const best = channelRows.length
       ? [...channelRows].sort((a,b) => (b.valor||0) - (a.valor||0))[0]
       : null;
@@ -1710,7 +1712,7 @@ function renderDestaques() {
         <div class="destaque-content">
           <div class="destaque-title">${best.titulo || '—'}</div>
           <div class="destaque-footer">
-            <span class="destaque-period">${best.periodo}</span>
+            <span class="destaque-period">${best.periodo}${isHist ? ' · histórico' : ''}</span>
             ${linkHtml}
           </div>
         </div>
