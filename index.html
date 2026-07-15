@@ -392,6 +392,28 @@
       font-weight: 500;
       white-space: nowrap;
     }
+    .date-presets { display: flex; gap: 4px; margin-right: 4px; }
+    .preset-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xs);
+      color: var(--text-2);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 9px;
+      height: 30px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .15s, background .2s, color .2s;
+    }
+    .preset-btn:hover { color: var(--text-1); border-color: var(--text-3); }
+    .preset-btn.active {
+      background: var(--text-1);
+      color: var(--surface);
+      border-color: var(--text-1);
+    }
+    body.light .preset-btn { background: var(--surface-2); }
     .date-input {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -653,10 +675,15 @@
 
   <div class="topbar-right">
     <div class="date-filter">
+      <div class="date-presets">
+        <button type="button" class="preset-btn" data-preset="mes"   onclick="setPreset('mes')">Este mês</button>
+        <button type="button" class="preset-btn" data-preset="ant"   onclick="setPreset('ant')">Mês passado</button>
+        <button type="button" class="preset-btn" data-preset="tudo"  onclick="setPreset('tudo')">Tudo</button>
+      </div>
       <span class="date-filter-sep">De</span>
-      <input type="date" id="filterFrom" class="date-input" onchange="applyFilter()" title="Data inicial do período" />
+      <input type="date" id="filterFrom" class="date-input" onchange="onManualDate()" title="Data inicial do período" />
       <span class="date-filter-sep">até</span>
-      <input type="date" id="filterTo"   class="date-input" onchange="applyFilter()" title="Data final do período" />
+      <input type="date" id="filterTo"   class="date-input" onchange="onManualDate()" title="Data final do período" />
     </div>
     <div class="update-info">
       Última atualização<br>
@@ -901,15 +928,18 @@ function toDate(v) {
   if (!v) return null;
   if (v instanceof Date) return isNaN(v.getTime())?null:v;
   const s = String(v).trim();
-  /* tenta DD/MM/YYYY e DD-MM-YYYY ANTES do parse direto, para evitar
-     interpretação americana (MM/DD) pelo motor JS */
-  const tries = [
-    s.replace(/^(\d{2})\/(\d{2})\/(\d{4})$/,'$3-$2-$1'),
-    s.replace(/^(\d{2})-(\d{2})-(\d{4})$/,'$3-$2-$1'),
-    s,
-    s+'-01',
-  ];
-  for (const t of tries) {
+  /* normaliza DD/MM/YYYY e DD-MM-YYYY → YYYY-MM-DD (evita interpretação
+     americana MM/DD pelo motor JS) */
+  const iso = s
+    .replace(/^(\d{2})\/(\d{2})\/(\d{4})$/,'$3-$2-$1')
+    .replace(/^(\d{2})-(\d{2})-(\d{4})$/,'$3-$2-$1');
+  /* data de calendário YYYY-MM-DD → meia-noite LOCAL.
+     new Date("2026-06-01") seria UTC e, em fusos a oeste, jogaria a data
+     para o dia anterior — quebrando o filtro por mês. Construir por
+     componentes mantém a data no dia certo. */
+  let m = iso.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0));
+  for (const t of [iso, s, s+'-01']) {
     const d = new Date(t);
     if (!isNaN(d.getTime())) return d;
   }
@@ -1005,6 +1035,23 @@ function processChannel(parsed, cfg) {
 
   // ordena por data se disponível
   if (cols.date) rows.sort((a,b) => (!a.date?1:!b.date?-1:a.date-b.date));
+
+  /* deduplica linhas com a MESMA data (coleta rodou 2x / entrada manual repetida).
+     Mantém a última ocorrência, mas preenche campos vazios com valores anteriores
+     — assim uma linha duplicada sem impressões não apaga o valor já registrado. */
+  if (cols.date) {
+    const byDate = new Map();
+    for (const r of rows) {
+      const k = r.date ? r.date.getTime() : 'nd:' + Math.random();
+      const prev = byDate.get(k);
+      if (prev) {
+        for (const f of ['followers','reach','impressions','ctr','clicks','investment','conversions'])
+          if (r[f] == null && prev[f] != null) r[f] = prev[f];
+      }
+      byDate.set(k, r);
+    }
+    rows = [...byDate.values()].sort((a,b) => (!a.date?1:!b.date?-1:a.date-b.date));
+  }
 
   const sum = (key) => rows.reduce((s,r) => s + (r[key]||0), 0);
   const totals = {
@@ -1138,8 +1185,10 @@ function showError(msg) {
 
 /* ── Date filter ────────────────────────────────────────────── */
 /** Preenche os inputs com o intervalo real dos dados após o primeiro load */
+let DATA_MIN = null, DATA_MAX = null;  // intervalo real dos dados
+
 function initDateFilter() {
-  let minDate = null, maxDate = null;
+  DATA_MIN = null; DATA_MAX = null;
   for (const { parsed } of Object.values(RAW_PARSED)) {
     const colDate = findCol(parsed.heads, ALIASES.date);
     if (!colDate) continue;
@@ -1147,15 +1196,49 @@ function initDateFilter() {
       const d = row[colDate];
       const date = d instanceof Date ? d : toDate(d);
       if (!date) continue;
-      if (!minDate || date < minDate) minDate = date;
-      if (!maxDate || date > maxDate) maxDate = date;
+      if (!DATA_MIN || date < DATA_MIN) DATA_MIN = date;
+      if (!DATA_MAX || date > DATA_MAX) DATA_MAX = date;
     }
   }
+  /* padrão: abre no MÊS mais recente com dados (não no período inteiro),
+     para a manchete refletir o desempenho atual e não o pico de um mês antigo */
   const fromEl = document.getElementById('filterFrom');
   const toEl   = document.getElementById('filterTo');
-  /* only set defaults if the user hasn't already picked a range */
-  if (!fromEl.value && minDate) fromEl.value = minDate.toISOString().slice(0,10);
-  if (!toEl.value   && maxDate) toEl.value   = maxDate.toISOString().slice(0,10);
+  if (!fromEl.value && !toEl.value) {
+    setPreset('mes');
+  } else {
+    if (!fromEl.value && DATA_MIN) fromEl.value = DATA_MIN.toISOString().slice(0,10);
+    if (!toEl.value   && DATA_MAX) toEl.value   = DATA_MAX.toISOString().slice(0,10);
+  }
+}
+
+/* Edição manual do calendário: tira o destaque dos atalhos e reaplica */
+function onManualDate() {
+  document.querySelectorAll('.preset-btn.active').forEach(b => b.classList.remove('active'));
+  applyFilter();
+}
+
+/* Define o intervalo do filtro por atalho e reaplica.
+   'mes'  = mês do dado mais recente | 'ant' = mês anterior a esse | 'tudo' = tudo */
+function setPreset(preset) {
+  const fromEl = document.getElementById('filterFrom');
+  const toEl   = document.getElementById('filterTo');
+  const iso = d => d.toISOString().slice(0,10);
+  const ref = DATA_MAX || new Date();
+
+  if (preset === 'tudo') {
+    fromEl.value = DATA_MIN ? iso(DATA_MIN) : '';
+    toEl.value   = DATA_MAX ? iso(DATA_MAX) : '';
+  } else {
+    const off = preset === 'ant' ? 1 : 0;
+    const first = new Date(ref.getFullYear(), ref.getMonth() - off, 1);
+    const last  = new Date(ref.getFullYear(), ref.getMonth() - off + 1, 0);
+    fromEl.value = iso(first);
+    toEl.value   = iso(last);
+  }
+  document.querySelectorAll('.preset-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.preset === preset));
+  applyFilter();
 }
 
 /** Re-processa cada canal com as linhas filtradas pelo intervalo de datas */
@@ -1368,12 +1451,10 @@ function renderScorecards() {
     } else if (c.id === 'youtube') {
       card('\u25b6\ufe0f', 'Inscritos \u00b7 YouTube', ch.latestFollowers, fmtK, 'Total ao fim do per\u00edodo', ch.growthAbs);
     } else {
-      /* redes sociais: alcance/impress\u00f5es n\u00e3o se somam (a mesma pessoa \u00e9 contada
-         a cada semana). Mostramos o MELHOR resultado do per\u00edodo \u2014 a semana de pico. */
-      const bestReach = Math.max(0, ...ch.rows.map(r => r.reach || 0));
-      const bestImpr  = Math.max(0, ...ch.rows.map(r => r.impressions || 0));
-      if (bestReach > 0) card(c.icon, `Melhor alcance \u00b7 ${c.name}`, bestReach, fmtK, 'Maior alcance numa semana do per\u00edodo');
-      if (bestImpr > 0)  card('\ud83d\udc41\ufe0f', `Melhores impress\u00f5es \u00b7 ${c.name}`, bestImpr, fmtK, 'Maior valor numa semana do per\u00edodo');
+      /* redes sociais: alcance/impress\u00f5es somados no per\u00edodo selecionado
+         (a mesma pessoa pode ser contada em semanas diferentes \u2014 crit\u00e9rio pedido). */
+      if (t.reach > 0)       card(c.icon, `Alcance total \u00b7 ${c.name}`, t.reach, fmtK, 'Soma das semanas do per\u00edodo');
+      if (t.impressions > 0) card('\ud83d\udc41\ufe0f', `Impress\u00f5es totais \u00b7 ${c.name}`, t.impressions, fmtK, 'Soma das semanas do per\u00edodo');
       card('\u2795', `Seguidores \u00b7 ${c.name}`, ch.latestFollowers, fmtK, 'Total ao fim do per\u00edodo', ch.growthAbs);
     }
   });
