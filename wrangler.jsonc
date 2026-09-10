@@ -1,0 +1,17 @@
+{
+  "name": "renata-ferreira-dashboard",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-04-27",
+
+  // Só o que está em public/ vira arquivo público
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+
+  // Estado agregado do WaSeller (namespace "renata-dashboard-crm").
+  // Em `wrangler dev` o KV é simulado localmente, não toca neste.
+  "kv_namespaces": [{ "binding": "CRM", "id": "d80b0b571b7c4a95b57e7cd6ddf2cd89" }],
+
+  // Sincroniza a aba WaSeller_Log a cada 5 min
+  "triggers": { "crons": ["*/5 * * * *"] },
+
+  "observability": { "enabled": true }
+}
