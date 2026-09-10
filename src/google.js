@@ -9,8 +9,9 @@
 
 const ESCOPOS = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly';
 
-/** Consulta gviz e devolve a `table` da resposta. */
-export async function consultarPlanilha(env, { planilha, gid, aba, range, tq, headers = 1 }) {
+/** Consulta gviz e devolve a `table` da resposta. `publica: true` lê sem a
+    conta de serviço (planilhas abertas pelo link, como a de métricas). */
+export async function consultarPlanilha(env, { planilha, gid, aba, range, tq, headers = 1, publica = false }) {
   const params = { tqx: 'out:json', headers };
   if (gid)   params.gid = gid;
   if (aba)   params.sheet = aba;
@@ -18,7 +19,7 @@ export async function consultarPlanilha(env, { planilha, gid, aba, range, tq, he
   if (tq)    params.tq = tq;
   const qs = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
 
-  const token = await tokenGoogle(env);
+  const token = publica ? null : await tokenGoogle(env);
   const res = await fetch(`https://docs.google.com/spreadsheets/d/${planilha}/gviz/tq?${qs}`,
                           token ? { headers: { Authorization: `Bearer ${token}` } } : {});
   if (!res.ok) throw new Error(`Sheets respondeu ${res.status}`);

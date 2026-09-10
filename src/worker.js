@@ -4,9 +4,11 @@
  *  - Serve o dashboard (public/index.html, static assets)
  *  - GET  /api/crm       → todo o CRM, anonimizado: leads das abas manuais (até
  *                          julho) + WaSeller (set/2026+) + consultas da Renata
+ *                          + investimento em Google Ads por mês (ads.js)
  *  - POST /api/crm/sync  → roda a sincronização na hora (exige SYNC_TOKEN)
  *  - Cron diário 7h (BRT) → lê as linhas novas da aba WaSeller_Log, relê as abas
- *                          manuais e a aba CONSULTAS, e grava tudo no KV
+ *                          manuais, a aba CONSULTAS e o investimento do Ads, e
+ *                          grava tudo no KV (o script do Google Ads roda ~5h)
  *
  * O navegador NUNCA lê a planilha do CRM — só o Worker (ver google.js). Assim a
  * planilha pode ficar privada, compartilhada só com a conta de serviço.
@@ -25,6 +27,7 @@
 import { consultarPlanilha } from './google.js';
 import { chaveTelefone } from './chave.js';
 import { PLANILHA_CRM, MESES, lerAbasManuais, lerConsultas } from './planilha-crm.js';
+import { lerInvestimento } from './ads.js';
 
 const LOG_GID   = '1469639904'; // aba WaSeller_Log
 const DESDE     = '2026-09';    // 1º mês servido pelo WaSeller (antes disso: abas manuais)
@@ -32,6 +35,7 @@ const CHUNK     = 250;          // linhas por lote (~2 ms de CPU)
 const MAX_LOTES = 3;            // lotes por execução — um dia normal cabe em 1; o resto fica pro dia seguinte
 const STATE_KEY    = 'waseller:state:v2';
 const PLANILHA_KEY = 'crm:planilha:v1';
+const ADS_KEY      = 'ads:v1';
 
 /* Filtro aplicado PELO GOOGLE antes de mandar os dados: descarta payload de
    teste, grupo, status e mensagem com mídia (são ~60% dos bytes do log e não
@@ -89,10 +93,10 @@ export default {
     const url = new URL(req.url);
 
     if (url.pathname === '/api/crm' && req.method === 'GET') {
-      const [estado, planilha] = await Promise.all([
-        env.CRM.get(STATE_KEY, 'json'), env.CRM.get(PLANILHA_KEY, 'json'),
+      const [estado, planilha, ads] = await Promise.all([
+        env.CRM.get(STATE_KEY, 'json'), env.CRM.get(PLANILHA_KEY, 'json'), env.CRM.get(ADS_KEY, 'json'),
       ]);
-      return json(montarResposta(estado, planilha), { 'Cache-Control': 'no-store' });
+      return json(montarResposta(estado, planilha, ads), { 'Cache-Control': 'no-store' });
     }
 
     if (url.pathname === '/api/crm/sync' && req.method === 'POST') {
@@ -122,7 +126,7 @@ function json(obj, headers = {}, status = 200) {
 /* WaSeller e planilha falham de forma independente: um erro num lado não
    impede o outro de atualizar (e fica registrado no log do cron). */
 async function sincronizar(env) {
-  const r = { waseller: [], planilha: null };
+  const r = { waseller: [], planilha: null, ads: null };
   try {
     for (let i = 0; i < MAX_LOTES; i++) {
       const lote = await sincronizarLoteWaSeller(env);
@@ -136,6 +140,12 @@ async function sincronizar(env) {
     await env.CRM.put(PLANILHA_KEY, JSON.stringify({ leads, consultas, lidoEm: new Date().toISOString() }));
     r.planilha = { leads: leads.length, consultas };
   } catch (e) { r.planilha = { erro: e.message }; }
+
+  try {
+    const ads = await lerInvestimento(env, await env.CRM.get(ADS_KEY, 'json'));
+    await env.CRM.put(ADS_KEY, JSON.stringify({ ...ads, lidoEm: new Date().toISOString() }));
+    r.ads = { fonte: ads.fonte, meses: Object.fromEntries(Object.entries(ads.meses).map(([m, v]) => [m, v.custo])) };
+  } catch (e) { r.ads = { erro: e.message }; }
   return r;
 }
 
@@ -264,7 +274,7 @@ function dataGviz(v) {
 
 /* ── Resposta da API ─────────────────────────────────────────────────────── */
 
-function montarResposta(estado, planilha) {
+function montarResposta(estado, planilha, ads) {
   const leads = [...(planilha?.leads || [])];
   for (const [k, meses] of Object.entries(estado?.contatos || {})) {
     for (const [mes, e] of Object.entries(meses)) {
@@ -292,6 +302,7 @@ function montarResposta(estado, planilha) {
     sincronizando: !estado || !!estado.sincronizando,
     planilhaLidaEm: planilha?.lidoEm || null,
     consultas: planilha?.consultas || {},
+    ads: ads ? { fonte: ads.fonte, lidoEm: ads.lidoEm, meses: ads.meses } : null,
     leads,
   };
 }

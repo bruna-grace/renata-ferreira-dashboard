@@ -652,6 +652,9 @@
                    border:1px solid currentColor; }
     .crm-kpi-tag.previa  { color:var(--amber); }
     .crm-kpi-tag.fechado { color:var(--green); }
+    .crm-sub-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin:4px 0 10px; }
+    .crm-kpi-grid.tres { grid-template-columns:repeat(3,1fr); }
+    @media(max-width:700px){ .crm-kpi-grid.tres{grid-template-columns:1fr;} }
     .crm-charts-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
     .crm-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
     .crm-bar-label { font-size:12px; color:var(--text-2); width:100px; flex-shrink:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -739,6 +742,9 @@
       </div>
       <div class="crm-kpi-grid" id="crmKpis"></div>
       <div class="crm-note" id="crmIndicacaoNote"></div>
+      <div class="crm-sub-label">Investimento em Ads × CRM</div>
+      <div class="crm-kpi-grid tres" id="crmAdsKpis"></div>
+      <div class="crm-note" id="crmAdsNote"></div>
       <div class="crm-charts-grid">
         <div class="chart-card">
           <div class="chart-title">Origem dos Leads</div>
@@ -840,6 +846,10 @@ const SHEET_ID = '1RuTUcnxjWmAkXYtCQSLRX3pLdLo6H1qsTskGdQTrTeU';
 const CRM_API = '/api/crm';
 let CRM_RESPOSTA  = null;  // última resposta da API (aviso de sincronização)
 let CRM_CONSULTAS = {};    // 'YYYY-MM' → consultas realizadas (informado pela Renata)
+
+/* Origens que contam como MÍDIA PAGA no custo por lead (decisão da Bruna, 10/09/26).
+   YouTube entra mesmo misturando a campanha paga com o canal orgânico. */
+const ORIGENS_PAGAS = ['Google', 'Tráfego', 'Site', 'YouTube'];
 
 /* ── CANAIS ──────────────────────────────────────────────────── */
 const CHANNELS = [
@@ -1802,6 +1812,63 @@ function initCRMMonthPicker() {
   sel.onchange = () => { CRM_SELECTED_TAB = sel.value; renderCRM(); };
 }
 
+/* ── Investimento em Ads × CRM ──
+   Custo por lead     = investimento ÷ leads de MÍDIA PAGA (ORIGENS_PAGAS).
+   Custo por consulta = investimento ÷ TODAS as consultas do mês — oficial da
+                        Renata quando o mês fecha, prévia do CRM até lá (o número
+                        dela não separa por origem).
+   Só entram meses com os dois lados: investimento (Google Ads) E CRM. */
+function renderCRMInvestimento(abasEscopo, convMeses) {
+  const adsMeses = CRM_RESPOSTA?.ads?.meses || {};
+  const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const meses = abasEscopo.map((aba, i) => {
+    const mes = CRM_RAW.find(l => l.aba === aba)?.mes;
+    return {
+      aba, mes, conv: convMeses[i],
+      inv: adsMeses[mes]?.custo || 0,
+      leadsPagos: CRM_RAW.filter(l => l.aba === aba && ORIGENS_PAGAS.includes(l.origem)).length,
+    };
+  });
+  meses.sort((a, b) => (a.mes || '') < (b.mes || '') ? -1 : 1);
+  const usados = meses.filter(m => m.inv > 0);
+  const semInv = meses.filter(m => !(m.inv > 0)).map(m => crmMonthLabel(m.aba));
+
+  /* sem investimento no escopo, os contadores ainda mostram o que o CRM tem */
+  const base       = usados.length ? usados : meses;
+  const inv        = usados.reduce((s, m) => s + m.inv, 0);
+  const leadsPagos = base.reduce((s, m) => s + m.leadsPagos, 0);
+  const consultas  = base.reduce((s, m) => s + m.conv.valor, 0);
+  const fechado    = base.length > 0 && base.every(m => m.conv.estado === 'fechado');
+  const parcial    = usados.some(m => !crmMesAcabou(m.mes));
+  const tag = (txt, cls) => `<span class="crm-kpi-tag ${cls}">${txt}</span>`;
+  const card = (val, label, sub) => `
+    <div class="crm-kpi">
+      <div class="crm-kpi-val">${val}</div>
+      <div class="crm-kpi-label">${label}</div>
+      <div class="crm-kpi-sub">${sub}</div>
+    </div>`;
+
+  const invSub = !usados.length ? 'sem investimento registrado'
+               : CRM_SELECTED_TAB === 'todos' ? 'soma de ' + usados.map(m => crmMonthLabel(m.aba)).join(', ')
+               : parcial ? 'Google Ads · até hoje' : 'Google Ads · mês fechado';
+  document.getElementById('crmAdsKpis').innerHTML =
+    card(usados.length ? brl(inv) + (parcial ? tag('parcial', 'previa') : '') : '—', 'Investimento em Ads', invSub) +
+    card(usados.length && leadsPagos ? brl(inv / leadsPagos) : '—', 'Custo por Lead',
+         `${leadsPagos} leads de mídia paga (${ORIGENS_PAGAS.join(', ')})`) +
+    card(usados.length && consultas ? brl(inv / consultas) + tag(fechado ? 'fechado' : 'prévia', fechado ? 'fechado' : 'previa') : '—',
+         'Custo por Consulta',
+         fechado ? `${consultas} consultas realizadas (Renata)`
+         : base.some(m => m.conv.estado === 'fechado') ? `${consultas} consultas (Renata + prévia do CRM)`
+         : `${consultas} conversões pelo CRM (prévia)`);
+
+  const notas = [];
+  if (semInv.length) notas.push(`Sem investimento registrado em ${semInv.join(', ')} — ` +
+    (CRM_RESPOSTA?.ads?.fonte === 'Ads_Historico' ? 'não houve gasto em Ads no período.'
+      : 'o histórico anterior a agosto entra quando o script do Google Ads for atualizado (aba Ads_Historico).'));
+  if (usados.length) notas.push('YouTube conta como mídia paga, mas inclui leads do canal orgânico.');
+  document.getElementById('crmAdsNote').innerHTML = notas.join('<br>');
+}
+
 function renderCRM() {
   const section = document.getElementById('crm-section');
   if (!section) return;
@@ -1900,6 +1967,7 @@ function renderCRM() {
     ? 'Sincronizando o histórico do WaSeller — os números de setembro em diante ainda podem subir.'
     : '';
   document.getElementById('crmIndicacaoNote').innerHTML = [notaIndicacao, notaSync].filter(Boolean).join('<br>');
+  renderCRMInvestimento(abasEscopo, convMeses);
 
   /* ── Origem ── */
   const origemColors = {
