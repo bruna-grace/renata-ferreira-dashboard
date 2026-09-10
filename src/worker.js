@@ -2,26 +2,36 @@
  * Worker do dashboard da Dra. Renata Ferreira.
  *
  *  - Serve o dashboard (public/index.html, static assets)
- *  - GET  /api/crm       → leads do WaSeller já agregados por contato × mês
- *  - POST /api/crm/sync  → roda um passo de sincronização na hora (exige SYNC_TOKEN)
- *  - Cron a cada 5 min   → lê as linhas novas da aba WaSeller_Log e atualiza o KV
+ *  - GET  /api/crm       → todo o CRM, anonimizado: leads das abas manuais (até
+ *                          julho) + WaSeller (set/2026+) + consultas da Renata
+ *  - POST /api/crm/sync  → roda a sincronização na hora (exige SYNC_TOKEN)
+ *  - Cron diário 7h (BRT) → lê as linhas novas da aba WaSeller_Log, relê as abas
+ *                          manuais e a aba CONSULTAS, e grava tudo no KV
+ *
+ * O navegador NUNCA lê a planilha do CRM — só o Worker (ver google.js). Assim a
+ * planilha pode ficar privada, compartilhada só com a conta de serviço.
  *
  * Por que incremental: WaSeller_Log é o log CRU do webhook (payload inteiro,
  * inclusive mídia em base64). Passa de 10 MB e cresce ~130 linhas/dia.
  * Parsear tudo a cada request estoura os 10 ms de CPU do plano Free. O cron lê
- * no máximo CHUNK linhas por vez, a partir de um cursor de data, e acumula o
- * estado por contato no KV. O GET só lê esse estado (~0 CPU).
+ * em lotes de CHUNK linhas a partir de um cursor de data (no máximo MAX_LOTES
+ * por execução) e acumula o estado por contato no KV. O GET só lê o KV.
  *
  * Privacidade: a API NÃO devolve nome, telefone nem texto de mensagem — só uma
  * chave anônima (hash dos 8 últimos dígitos, usada p/ deduplicar com as abas
  * manuais), origem, status e data. É tudo o que o dashboard usa.
  */
 
-const SHEET_ID = '1UnpShR1ydhFy-4dKDdQLJFSEjXxf1IKmQ_YmlSQxLcQ';  // planilha "CRM - Renata"
-const LOG_GID  = '1469639904';                                     // aba WaSeller_Log
-const DESDE    = '2026-09';   // 1º mês servido pelo WaSeller (antes disso: abas manuais)
-const CHUNK    = 250;         // linhas por passo de sync (limita a CPU por execução)
-const STATE_KEY = 'waseller:state:v2';
+import { consultarPlanilha } from './google.js';
+import { chaveTelefone } from './chave.js';
+import { PLANILHA_CRM, MESES, lerAbasManuais, lerConsultas } from './planilha-crm.js';
+
+const LOG_GID   = '1469639904'; // aba WaSeller_Log
+const DESDE     = '2026-09';    // 1º mês servido pelo WaSeller (antes disso: abas manuais)
+const CHUNK     = 250;          // linhas por lote (~2 ms de CPU)
+const MAX_LOTES = 3;            // lotes por execução — um dia normal cabe em 1; o resto fica pro dia seguinte
+const STATE_KEY    = 'waseller:state:v2';
+const PLANILHA_KEY = 'crm:planilha:v1';
 
 /* Filtro aplicado PELO GOOGLE antes de mandar os dados: descarta payload de
    teste, grupo, status e mensagem com mídia (são ~60% dos bytes do log e não
@@ -79,8 +89,10 @@ export default {
     const url = new URL(req.url);
 
     if (url.pathname === '/api/crm' && req.method === 'GET') {
-      const estado = await env.CRM.get(STATE_KEY, 'json');
-      return json(montarResposta(estado), { 'Cache-Control': 'public, max-age=60' });
+      const [estado, planilha] = await Promise.all([
+        env.CRM.get(STATE_KEY, 'json'), env.CRM.get(PLANILHA_KEY, 'json'),
+      ]);
+      return json(montarResposta(estado, planilha), { 'Cache-Control': 'no-store' });
     }
 
     if (url.pathname === '/api/crm/sync' && req.method === 'POST') {
@@ -105,11 +117,33 @@ function json(obj, headers = {}, status = 200) {
   });
 }
 
-/* ── Sincronização incremental ───────────────────────────────────────────── */
+/* ── Sincronização ───────────────────────────────────────────────────────── */
 
+/* WaSeller e planilha falham de forma independente: um erro num lado não
+   impede o outro de atualizar (e fica registrado no log do cron). */
 async function sincronizar(env) {
+  const r = { waseller: [], planilha: null };
+  try {
+    for (let i = 0; i < MAX_LOTES; i++) {
+      const lote = await sincronizarLoteWaSeller(env);
+      r.waseller.push(lote);
+      if (!lote.sincronizando) break;
+    }
+  } catch (e) { r.waseller.push({ erro: e.message }); }
+
+  try {
+    const [leads, consultas] = await Promise.all([lerAbasManuais(env), lerConsultas(env)]);
+    await env.CRM.put(PLANILHA_KEY, JSON.stringify({ leads, consultas, lidoEm: new Date().toISOString() }));
+    r.planilha = { leads: leads.length, consultas };
+  } catch (e) { r.planilha = { erro: e.message }; }
+  return r;
+}
+
+/* Um lote do log, a partir do cursor salvo. Grava o estado a cada lote, então
+   uma execução interrompida não perde o que já processou. */
+async function sincronizarLoteWaSeller(env) {
   const estado = (await env.CRM.get(STATE_KEY, 'json')) || { v: 1, cursor: null, contatos: {} };
-  const linhas = await lerLog(estado.cursor);
+  const linhas = await lerLog(env, estado.cursor);
 
   const antes = JSON.stringify(estado.contatos);
   let cursor = estado.cursor;
@@ -124,7 +158,7 @@ async function sincronizar(env) {
     const m = num.match(/^(\d+)@(c\.us|lid)$/);
     if (!m) continue;
 
-    if (!chaves.has(m[1])) chaves.set(m[1], await hashTelefone(m[1]));
+    if (!chaves.has(m[1])) chaves.set(m[1], await chaveTelefone(m[1]));
     const k = chaves.get(m[1]);
     if (!k) continue;
 
@@ -146,8 +180,7 @@ async function sincronizar(env) {
     console.error(`cursor preso em ${cursor}: mais de ${CHUNK} linhas no mesmo segundo`);
   }
 
-  /* só grava se algo mudou — o KV grátis aceita 1.000 escritas/dia e o cron
-     roda 288x/dia; a borda do cursor (>=) é relida toda vez */
+  /* só grava se algo mudou (a borda do cursor, >=, é relida toda vez) */
   const grava = JSON.stringify(estado.contatos) !== antes
              || cursor !== estado.cursor || estado.sincronizando !== sincronizando;
   if (grava) {
@@ -204,20 +237,15 @@ function lerPayloadCompleto(cru) {
   try { return JSON.parse(cru); } catch { return null; }
 }
 
-async function lerLog(cursor) {
+async function lerLog(env, cursor) {
   const onde = (cursor ? `A >= datetime '${cursor}' and ` : '') + FILTRO;
-  const tq = `select A, C where ${onde} order by A limit ${CHUNK}`;
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq` +
-              `?tqx=out:json&gid=${LOG_GID}&headers=1&tq=${encodeURIComponent(tq)}`;
-
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Sheets respondeu ${res.status}`);
-  const txt = await res.text();
-  const dados = JSON.parse(txt.slice(txt.indexOf('(') + 1, txt.lastIndexOf(')')));
-  if (dados.status !== 'ok') throw new Error('gviz: ' + JSON.stringify(dados.errors || dados.status));
+  const tabela = await consultarPlanilha(env, {
+    planilha: PLANILHA_CRM, gid: LOG_GID,
+    tq: `select A, C where ${onde} order by A limit ${CHUNK}`,
+  });
 
   const out = [];
-  for (const r of dados.table.rows) {
+  for (const r of tabela.rows) {
     const ts = dataGviz(r.c[0]?.v);
     const cru = r.c[1]?.v;
     if (ts && cru) out.push({ ts, cru });
@@ -234,23 +262,11 @@ function dataGviz(v) {
   return `${m[1]}-${p(+m[2] + 1)}-${p(m[3])} ${p(m[4] || 0)}:${p(m[5] || 0)}:${p(m[6] || 0)}`;
 }
 
-/* Mesma função no index.html (crmHashTel): as duas pontas precisam gerar a
-   mesma chave p/ um lead das abas manuais bater com o mesmo lead no WaSeller.
-   8 últimos dígitos = imune a DDI, DDD e ao 9º dígito. */
-async function hashTelefone(tel) {
-  const d = String(tel).replace(/\D/g, '');
-  if (d.length < 8) return null;
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('rf:' + d.slice(-8)));
-  return [...new Uint8Array(buf)].slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 /* ── Resposta da API ─────────────────────────────────────────────────────── */
 
-function montarResposta(estado) {
-  if (!estado) return { fonte: 'WaSeller_Log', desde: DESDE, sincronizando: true, leads: [] };
-
-  const leads = [];
-  for (const [k, meses] of Object.entries(estado.contatos)) {
+function montarResposta(estado, planilha) {
+  const leads = [...(planilha?.leads || [])];
+  for (const [k, meses] of Object.entries(estado?.contatos || {})) {
     for (const [mes, e] of Object.entries(meses)) {
       if (mes === '_') continue;  // metadados do contato, não é mês
       /* contato sem etiqueta nenhuma e sem cadastro no CRM = conversa avulsa
@@ -258,20 +274,24 @@ function montarResposta(estado) {
       if (!e.tags.length && !e.nu) continue;
       leads.push({
         k, mes,
+        aba:    MESES[+mes.slice(5) - 1] + ' ' + mes.slice(2, 4),   // "SETEMBRO 26", como as abas manuais
         data:   e.f.slice(0, 10),
         origem: origemDe(e.tags),
         status: statusDe(e.tags, e.cv),
+        convenio: null,
+        fonte:  'waseller',
       });
     }
   }
-  leads.sort((a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : 0);
+  leads.sort((a, b) => (a.data || '9') < (b.data || '9') ? -1 : (a.data || '9') > (b.data || '9') ? 1 : 0);
 
   return {
-    fonte: 'WaSeller_Log',
     desde: DESDE,
-    atualizadoEm: estado.atualizadoEm || null,
-    ultimoEvento: estado.cursor,
-    sincronizando: !!estado.sincronizando,
+    atualizadoEm: estado?.atualizadoEm || null,   // última mudança no WaSeller
+    ultimoEvento: estado?.cursor || null,
+    sincronizando: !estado || !!estado.sincronizando,
+    planilhaLidaEm: planilha?.lidoEm || null,
+    consultas: planilha?.consultas || {},
     leads,
   };
 }

@@ -826,33 +826,20 @@
 /* ── ID DA PLANILHA ─────────────────────────────────────────── */
 const SHEET_ID = '1RuTUcnxjWmAkXYtCQSLRX3pLdLo6H1qsTskGdQTrTeU';
 
-/* ── CRM — planilha separada (somente leitura) ──────────────── */
-const CRM_SHEET_ID = '1UnpShR1ydhFy-4dKDdQLJFSEjXxf1IKmQ_YmlSQxLcQ';  // planilha "CRM - Renata"
-/* CRM contabilizado de Maio/2026 em diante — quando a Renata padronizou a
-   metodologia (tag "agendamento concluído"). Meses anteriores usavam outra
-   convenção e foram desconsiderados a pedido. Adicionar novos meses aqui.
-   Obs: a aba "FOLLOW MENSAL" é ignorada de propósito — os follow-ups já
-   aparecem dentro de cada mês pelo status "Follow" (evita duplicar leads). */
-const CRM_TABS = [
-  'MAIO 26','JUNHO 26','JULHO 26',
-];
-/* De Setembro/2026 em diante o CRM vem do webhook do WaSeller (aba WaSeller_Log),
-   agregado pelo Worker em /api/crm (ver src/worker.js — é lá que ficam as regras
-   etiqueta → origem/status). As abas acima continuam servindo os meses
-   anteriores. Não existe aba de Agosto. Fora do Worker (ex: GitHub Pages) a API
-   não existe e o CRM mostra só as abas manuais. */
-const CRM_API   = '/api/crm';
-const CRM_MESES = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
-let CRM_WASELLER = null;  // última resposta da API (usada p/ o aviso de sincronização)
-
-/* CONVERSÃO OFICIAL = consultas realizadas no mês. Só a Renata tem esse número;
-   ele é digitado na aba abaixo (planilha do CRM) depois que ela informa:
-     Mês     | Consultas realizadas | Observação (opcional)
-     09/2026 | 32                   |
-   O mês só FECHA quando acabou E o número está lá. Até isso, o dashboard mostra
-   a PRÉVIA pelo CRM (leads com agendamento concluído / 1ª consulta no mês). */
-const CRM_CONSULTAS_TAB = 'CONSULTAS';
-let CRM_CONSULTAS = {};   // 'YYYY-MM' → consultas realizadas (informado pela Renata)
+/* ── CRM ─────────────────────────────────────────────────────────
+   O navegador NÃO lê a planilha do CRM (tem dados de pacientes). Tudo vem do
+   Worker em /api/crm, já anonimizado (sem nome/telefone) — ver src/:
+     - abas manuais MAIO/JUNHO/JULHO 26 (planilha-crm.js)
+     - WaSeller, de Setembro/2026 em diante (worker.js — regras etiqueta → status)
+     - aba CONSULTAS: a CONVERSÃO OFICIAL = consultas realizadas no mês, que só
+       a Renata informa. O mês só FECHA quando acabou E o número está lá; até
+       isso, o dashboard mostra a PRÉVIA pelo CRM (agendamento concluído /
+       1ª consulta no mês).
+   O Worker atualiza 1x por dia, às 7h. Fora do Worker (ex: abrir o arquivo
+   local) a API não existe e a seção de CRM some. */
+const CRM_API = '/api/crm';
+let CRM_RESPOSTA  = null;  // última resposta da API (aviso de sincronização)
+let CRM_CONSULTAS = {};    // 'YYYY-MM' → consultas realizadas (informado pela Renata)
 
 /* ── CANAIS ──────────────────────────────────────────────────── */
 const CHANNELS = [
@@ -1012,28 +999,6 @@ function parseGviz(data) {
   }).filter(r => Object.values(r).some(v => v !== null && v !== '' && v !== undefined));
 
   return { heads, rows };
-}
-
-/* Converte resposta gviz (headers=0) num grid bruto: array de linhas,
-   cada linha é um array posicional de valores de célula (datas viram texto). */
-function parseGvizGrid(data) {
-  const table = data.table;
-  if (!table || !table.cols) throw new Error('gviz sem tabela');
-  const nc = table.cols.length;
-  return (table.rows || []).map(r => {
-    const arr = [];
-    for (let i = 0; i < nc; i++) {
-      const cell = (r.c || [])[i];
-      if (!cell || cell.v === null || cell.v === undefined) { arr.push(''); continue; }
-      const v = cell.v;
-      if (typeof v === 'string' && v.startsWith('Date(')) {
-        arr.push(cell.f || v.replace(/Date\((\d+),(\d+),(\d+).*/, (m,y,mo,d) => `${+d}/${+mo+1}/${y}`));
-      } else {
-        arr.push(v);
-      }
-    }
-    return arr;
-  });
 }
 
 function processChannel(parsed, cfg) {
@@ -1744,16 +1709,8 @@ function renderDestaques() {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   CRM — Controle de Leads
-   Lê planilha separada (CRM_SHEET_ID), somente leitura.
-   Duas estruturas de dados:
-     - Antiga (Set–Fev): Nome|Telefone|Origem|Data|Fechou?|Motivo
-     - Nova   (Mar+):    STATUS|Nome|Telefone|Origem|Cidade|Data|…
+   CRM — Controle de Leads (dados do Worker, ver CRM_API)
    ═══════════════════════════════════════════════════════════════ */
-
-/* Abas que usam o parser robusto de grid (multi-seção, cabeçalho variável).
-   Apenas Maio e Junho — os demais meses continuam no parser original. */
-const CRM_GRID_TABS = new Set(['MAIO 26', 'JUNHO 26', 'JULHO 26']);
 
 /* Rótulo amigável da aba-mês: "MAIO 26" → "Maio 2026" (Title Case + ano de 4 díg.) */
 function crmMonthLabel(a) {
@@ -1763,123 +1720,24 @@ function crmMonthLabel(a) {
     .replace(/(^|\s)([a-zà-ÿ])/g, (m, p, c) => p + c.toUpperCase());
 }
 
-/* Fetch padrão (parser original): pula linha 1 (título), cabeçalho na linha 2 */
-function fetchCRMSheet(tabName) {
-  return crmJsonp(tabName, 'A2:J', 1, parseGviz);
-}
-
-/* Fetch robusto p/ Maio/Junho: grid bruto, o parser detecta cabeçalho/seções */
-function fetchCRMGrid(tabName) {
-  return crmJsonp(tabName, 'A:N', 0, parseGvizGrid);
-}
-
-function crmJsonp(tabName, range, headers, parseFn) {
-  return new Promise((resolve, reject) => {
-    const cb = 'crmCb' + Date.now() + Math.floor(Math.random() * 99999);
-    const timer = setTimeout(() => {
-      delete window[cb]; document.getElementById(cb)?.remove();
-      reject(new Error('timeout: ' + tabName));
-    }, 12000);
-
-    window[cb] = function(data) {
-      clearTimeout(timer); delete window[cb]; document.getElementById(cb)?.remove();
-      if (!data || data.status === 'error') { reject(new Error('gviz err: ' + tabName)); return; }
-      try { resolve(parseFn(data)); } catch(e) { reject(e); }
-    };
-
-    const script = document.createElement('script');
-    script.id  = cb;
-    script.src = 'https://docs.google.com/spreadsheets/d/' + CRM_SHEET_ID +
-                 '/gviz/tq?tqx=out:json;responseHandler:' + cb +
-                 '&sheet=' + encodeURIComponent(tabName) +
-                 '&range=' + range + '&headers=' + headers + '&_nc=' + Date.now();
-    script.onerror = () => { clearTimeout(timer); delete window[cb]; script.remove(); reject(new Error('err: ' + tabName)); };
-    document.head.appendChild(script);
-  });
-}
-
 async function fetchCRM() {
-  const [results, waseller, consultas] = await Promise.all([
-    Promise.allSettled(CRM_TABS.map(tab =>
-      CRM_GRID_TABS.has(tab) ? fetchCRMGrid(tab) : fetchCRMSheet(tab)
-    )),
-    fetchCRMWaSeller().catch(e => { console.warn('CRM WaSeller indisponível:', e); return null; }),
-    fetchCRMConsultas().catch(e => { console.warn('Aba de consultas indisponível:', e); return {}; }),
-  ]);
+  let r = null;
+  try {
+    const res = await fetch(CRM_API, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    r = await res.json();
+  } catch (e) { console.warn('CRM indisponível:', e); }
 
-  /* Cada lead é etiquetado com a ABA de origem (o mês em que a Renata o arquivou).
-     O agrupamento do CRM passa a ser por aba — bate com a fonte de verdade e fica
-     imune a typo de data. A dedupe é feita DENTRO de cada aba (mesmo lead repetido
-     em duas seções da mesma aba conta uma vez), mas NÃO entre abas (um lead que
-     aparece na aba de maio e na de junho conta nas duas). */
-  CRM_RAW = [];
-  CRM_WASELLER = waseller;
-  CRM_CONSULTAS = consultas;
-  for (let i = 0; i < results.length; i++) {
-    const res = results[i];
-    if (res.status !== 'fulfilled') continue;
-    const tab = CRM_TABS[i];
-    let leads = CRM_GRID_TABS.has(tab) ? parseCRMGrid(res.value) : parseCRMRows(res.value);
-    await Promise.all(leads.map(async l => { l.k = await crmHashTel(l.telefone); }));
-
-    const seen = new Set();
-    leads = leads.filter(l => {
-      const key = crmKey(l);
-      if (seen.has(key)) return false;
-      seen.add(key); return true;
-    });
-    leads.forEach(l => { l.aba = tab; l.abaIdx = i; });
-    CRM_RAW.push(...leads);
-  }
-
-  /* WaSeller: um lead por contato × mês, já normalizado pelo Worker (sem nome
-     nem telefone — só a chave anônima). Cada mês vira uma "aba" sintética no
-     mesmo formato das manuais ("SETEMBRO 26"), ordenada depois delas. */
-  (waseller?.leads || []).forEach(l => {
-    const [y, m, d] = l.data.split('-').map(Number);
-    CRM_RAW.push({
-      nome: '', telefone: '', k: l.k, fonte: 'waseller',
-      origem: l.origem, status: l.status, convenio: null,
-      date: new Date(y, m - 1, d),
-      aba: CRM_MESES[m - 1] + ' ' + String(y).slice(-2),
-      abaIdx: CRM_TABS.length + y * 12 + m,
-    });
+  /* Cada lead já vem etiquetado com a ABA (mês) de origem — manual ("MAIO 26")
+     ou do WaSeller ("SETEMBRO 26"). O agrupamento do CRM é por aba. */
+  CRM_RESPOSTA  = r;
+  CRM_CONSULTAS = r?.consultas || {};
+  CRM_RAW = (r?.leads || []).map(l => {
+    const [y, m] = l.mes.split('-').map(Number);
+    const d = l.data ? l.data.split('-').map(Number) : null;
+    return { ...l, date: d ? new Date(d[0], d[1] - 1, d[2]) : null, abaIdx: y * 12 + m };
   });
-
   CRM_RAW.sort((a,b) => (!a.date ? 1 : !b.date ? -1 : a.date - b.date));
-}
-
-async function fetchCRMConsultas() {
-  const { heads, rows } = await crmJsonp(CRM_CONSULTAS_TAB, 'A:C', 1, parseGviz);
-  /* aba inexistente → o gviz devolve a PRIMEIRA aba da planilha, sem erro.
-     Sem as colunas "Mês" e "Consultas...", não é a aba certa: ignora. */
-  const hMes = heads.find(h => h === 'mes' || h.startsWith('mes_'));
-  const hNum = heads.find(h => h.includes('consulta'));
-  if (!hMes || !hNum) return {};
-  const out = {};
-  for (const r of rows) {
-    const mes = crmMesDe(r[hMes]);
-    const n = toNum(r[hNum]);
-    if (mes && n !== null) out[mes] = n;   // célula vazia = ainda não informado
-  }
-  return out;
-}
-
-/* "09/2026", "9/26", "2026-09", "01/09/2026", "Setembro 2026", "SET/26",
-   uma célula de data, ou o nome de uma aba ("SETEMBRO 26") → "2026-09" */
-function crmMesDe(v) {
-  const p2 = n => String(n).padStart(2, '0');
-  const ano = y => y.length === 2 ? '20' + y : y;
-  if (v instanceof Date) return isNaN(v) ? null : v.getFullYear() + '-' + p2(v.getMonth() + 1);
-  const s = norm(v || '');
-  let m = s.match(/^(\d{4})_(\d{1,2})$/);                if (m) return `${m[1]}-${p2(m[2])}`;
-  m = s.match(/^(?:\d{1,2}_)?(\d{1,2})_(\d{4}|\d{2})$/);  if (m) return `${ano(m[2])}-${p2(m[1])}`;
-  m = s.match(/^([a-z]{3,})_?(\d{4}|\d{2})$/);
-  if (m) {
-    const i = CRM_MESES.findIndex(n => norm(n).startsWith(m[1].slice(0, 3)));
-    if (i >= 0) return `${ano(m[2])}-${p2(i + 1)}`;
-  }
-  return null;
 }
 
 /* O mês acabou? (hoje já é dia 1º do mês seguinte ou depois) */
@@ -1891,7 +1749,7 @@ function crmMesAcabou(mes) {
 /* Conversão de uma aba-mês: oficial (Renata) quando o mês fechou com o número
    informado; senão, prévia pelo CRM. */
 function crmConversaoMes(aba) {
-  const mes = crmMesDe(aba);
+  const mes = CRM_RAW.find(l => l.aba === aba)?.mes;
   const previa = CRM_RAW.filter(l => l.aba === aba && l.status === 'Agendamento concluído').length;
   const informado = mes ? CRM_CONSULTAS[mes] : undefined;
   const acabou = mes ? crmMesAcabou(mes) : true;
@@ -1899,238 +1757,6 @@ function crmConversaoMes(aba) {
   if (informado != null) estado = acabou ? 'fechado' : 'parcial';
   else estado = acabou ? 'aguardando' : 'andamento';
   return { mes, previa, informado, estado, valor: informado != null ? informado : previa };
-}
-
-async function fetchCRMWaSeller() {
-  const res = await fetch(CRM_API);
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
-}
-
-/* Chave de dedupe: hash do telefone quando existe, senão nome + data.
-   crmHashTel é a MESMA função do Worker (src/worker.js, hashTelefone) — tem que
-   continuar igual, senão um lead das abas manuais não bate com ele mesmo no WaSeller.
-   8 últimos dígitos = imune a DDI, DDD e ao 9º dígito. */
-function crmKey(l) {
-  return l.k ? 'k:' + l.k
-             : 'nm:' + (l.nome || '').toLowerCase().trim() + '|' + (l.date ? l.date.getTime() : '');
-}
-
-async function crmHashTel(tel) {
-  const d = String(tel || '').replace(/\D/g, '');
-  if (d.length < 8 || !window.crypto?.subtle) return null;  // subtle só existe em https/localhost
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('rf:' + d.slice(-8)));
-  return [...new Uint8Array(buf)].slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function parseCRMDate(v) {
-  if (!v) return null;
-  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
-  const s = String(v).trim();
-  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
-  if (m) { const y = +m[3] < 50 ? 2000 + +m[3] : 1900 + +m[3]; return new Date(y, +m[2]-1, +m[1]); }
-  return null;
-}
-
-function normCRMStatus(raw, isNew) {
-  if (!raw) return isNew ? 'Sem status' : 'Não convertido';
-  const s = String(raw).trim().toUpperCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g,'');
-  if (!isNew) return (s === 'SIM' ? 'Finalizado' : 'Não convertido');
-  /* "agendamento concluído" = única tag que conta como conversão real */
-  if (s.includes('AGENDAMENTO') && s.includes('CONCLU')) return 'Agendamento concluído';
-  if (s.startsWith('AGEN')) return 'Agendado';  // agendamentos pendentes (não é conversão)
-  if (s.startsWith('DECL')) return 'Declinado';
-  if (s.startsWith('FOL'))  return 'Follow';  // pega "Follow", "Folow" (typo), "Follow Mensal"
-  if (s.startsWith('FINAL')) return 'Finalizado';
-  if (s.startsWith('AGUARD')) return 'Aguardando retorno';
-  if (s.includes('NUNCA') && s.includes('RESPOND')) return 'Nunca respondeu';
-  if (s.includes('ATENDIMENTO') && s.includes('INICIA')) return 'Atendimento iniciado';
-  /* fallback: Title Case p/ não fragmentar status por caixa ("NUNCA" vs "Nunca") */
-  const t = String(raw).trim();
-  return t ? t.toLowerCase().replace(/(^|\s)([a-zà-ÿ])/g, (m,p,c) => p + c.toUpperCase()) : 'Sem status';
-}
-
-function normCRMOrigem(raw) {
-  if (!raw || raw === '-' || raw === 'null') return 'Não informado';
-  const s = String(raw).trim().toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g,'');
-  if (s.includes('instagram') || s.includes('intagram') || s.includes('instag')) return 'Instagram';
-  if (s.includes('youtube'))   return 'YouTube';
-  if (s.includes('google'))    return 'Google';
-  if (s.includes('whatsapp') || s.startsWith('whats'))  return 'WhatsApp';
-  if (s.includes('trafego') || s.includes('anuncio') || s.includes('ads')) return 'Tráfego';
-  if (s === 'site' || s.includes('site '))  return 'Site';
-  if (s.includes('indicac') || s.includes('indicou') || s.includes('dr.') || s.includes('dra.')) return 'Indicação';
-  if (!s || s === 'nao informado' || s === 'nao_informado') return 'Não informado';
-  /* fallback: Title Case p/ não fragmentar por caixa ("TRÁFEGO" vs "Tráfego") */
-  return String(raw).trim().toLowerCase().replace(/(^|\s)([a-zà-ÿ])/g, (m,p,c) => p + c.toUpperCase());
-}
-
-/* Normaliza o campo "Plano de saúde?" → nome do convênio, ou null se não tem */
-function normCRMConvenio(raw) {
-  if (!raw) return null;
-  // remove prefixo "Sim", "Sim -", "Sim," → sobra a operadora (se houver)
-  let txt = String(raw).trim().replace(/^sim\b[\s,;:.\-]*/i, '').trim();
-  const s = txt.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
-
-  // valores que NÃO são operadora (sem convênio, notas ou status vazado de outras colunas)
-  const naoConv = new Set(['','-','--','nao','n','nenhum','sem','particular','null','na','n/d',
-    'agendado','em andamento','em atendimento','finalizado','follow','declinado','reagendar',
-    'nao citado','nao informado','nao reembolsa','reembolsa','sim','x']);
-  if (naoConv.has(s) || s.startsWith('nao ') || s.startsWith('particular') ||
-      s.startsWith('esta mudando') || s.startsWith('servidora') || s.startsWith('de servidora'))
-    return null;
-
-  // agrupa operadoras conhecidas (cobre variantes de grafia)
-  if (s.includes('unimed'))                                  return 'Unimed';
-  if (s.includes('sul america') || s.includes('sulamerica')) return 'SulAmérica';
-  if (s.includes('porto'))                                   return 'Porto Seguro';
-  if (s.includes('bradesco'))                                return 'Bradesco';
-  if (s.includes('notre'))                                   return 'NotreDame';
-  if (s.includes('amil'))                                    return 'Amil';
-  if (s.includes('prevent'))                                 return 'Prevent Senior';
-  if (s.includes('med senior') || s.includes('medsenior'))   return 'Med Senior';
-  if (s.includes('hap'))                                     return 'Hapvida';
-  if (s.includes('care plus') || s.includes('careplus') || s.includes('care +')) return 'Care Plus';
-  if (s.includes('intermedica'))                             return 'Intermédica';
-  if (s.includes('biovida'))                                 return 'Biovida Saúde';
-  if (s.includes('golden'))                                  return 'Golden Cross';
-  if (s.includes('omint'))                                   return 'Omint';
-  if (s.includes('sompo'))                                   return 'Sompo';
-  if (s.includes('geap'))                                    return 'GEAP';
-  if (s.includes('iamspe'))                                  return 'IAMSPE';
-  if (s.includes('sao francisco'))                           return 'São Francisco';
-  if (s.includes('sao cristovao'))                           return 'São Cristóvão';
-  if (s.includes('sao bernardo'))                            return 'São Bernardo';
-  if (s.includes('santa casa'))                              return 'Santa Casa';
-  if (s.includes('trasmontano'))                             return 'Trasmontano';
-  if (s.includes('correios') || s.includes('portal saude'))  return 'Portal Saúde';
-  if (s.includes('alice'))                                   return 'Alice';
-  if (s.includes('medservice'))                              return 'Medservice';
-  if (s.includes('sistema saude'))                           return 'Sistema Saúde';
-  if (s.includes('geap'))                                    return 'GEAP';
-  if (s.includes('unica'))                                   return 'Única';
-  if (s.includes('iamspe') || s.includes('cbpm') || s.includes('caixa')) return 'Outros (servidor público)';
-
-  // fallback: Title Case seguro (não quebra em letras acentuadas)
-  return txt.toLowerCase().replace(/(^|\s)([a-zà-ÿ])/g, (m,p,c) => p + c.toUpperCase());
-}
-
-/* Parser ORIGINAL (demais meses): cabeçalho único vindo do gviz (headers=1). */
-function parseCRMRows({ heads, rows }) {
-  if (!heads || !rows) return [];
-  const isNew = heads[0] === 'status';
-  const result = [];
-  for (const r of rows) {
-    // pula linhas de cabeçalho repetidas
-    const a0 = String(r[heads[0]] || '').trim();
-    if (a0 === 'STATUS' || a0 === 'Nome' || a0 === 'status' || a0 === 'nome') continue;
-    const nome   = isNew ? (r['nome']||'') : (r[heads[0]]||'');
-    const origem = isNew ? (r['origem']||r['origem_']||'') : (r['origem']||'');
-    if (!nome && !origem) continue;
-
-    const rawDate   = r['data_contato'] || r['data'] || null;
-    const rawStatus = isNew ? (r['status']||'') : (r['fechou']||r['fechou_']||'');
-    const rawConv   = r['plano_de_saude'] || r['plano_de_saude_'] || r['convenio'] || null;
-
-    result.push({
-      nome:     String(nome).trim(),
-      origem:   normCRMOrigem(String(origem).trim()),
-      status:   normCRMStatus(String(rawStatus).trim(), isNew),
-      convenio: normCRMConvenio(rawConv),
-      date:     parseCRMDate(rawDate),
-    });
-  }
-  return result;
-}
-
-/* Parser robusto de grid de CRM — usado APENAS em Maio/Junho.
-   Lida com abas de estruturas variadas:
-     - cabeçalho na linha 1 ou na linha 2 (após título mesclado)
-     - múltiplas seções com cabeçalhos repetidos (ex: "Maio 2026")
-     - com coluna STATUS (formato novo) ou sem (formato antigo, usa "Fechou?")
-   Detecta cabeçalhos linha a linha e aplica o mapa de colunas vigente. */
-function parseCRMGrid(grid) {
-  if (!grid || !grid.length) return [];
-  const result = [];
-  let map = null;
-
-  const cellStr   = c => String(c == null ? '' : c).trim();
-  const normCell  = c => norm(cellStr(c));
-  const isHeader  = (cells) => {
-    const n = cells.map(normCell);
-    return n.includes('nome') || (n.includes('status') && n.includes('origem'));
-  };
-  const buildMap = (cells) => {
-    const n = cells.map(normCell);
-    const find = (al) => n.findIndex(x => al.includes(x));
-    const idxStatus = find(['status']);
-    /* formato NOVO (STATUS na col 0): layout posicional fixo.
-       Necessário porque alguns cabeçalhos têm Telefone/Data em branco e não
-       dá pra localizá-los por nome:
-       0=STATUS 1=Nome 2=Telefone 3=Origem 4=Cidade 5=Data 6=Motivo 7=Plano */
-    if (idxStatus === 0) {
-      return { idxNome:1, idxTel:2, idxStatus:0, idxFechou:-1, idxOrigem:3, idxData:5, idxConv:7, isNew:true };
-    }
-    /* formato ANTIGO: Nome|Telefone|Origem|Data|Fechou?|Motivo.
-       Usa o cabeçalho quando o rótulo existe; senão cai na posição padrão
-       (vários cabeçalhos têm Telefone/Data em branco). */
-    const at = (al, def) => { const i = find(al); return i >= 0 ? i : def; };
-    let idxData = find(['data_contato']); if (idxData < 0) idxData = find(['data']); if (idxData < 0) idxData = 3;
-    return {
-      idxNome:   at(['nome'], 0),
-      idxTel:    at(['telefone','telefone_','fone','whatsapp'], 1),
-      idxStatus: -1,
-      idxFechou: at(['fechou','fechou_'], 4),
-      idxOrigem: at(['origem'], 2),
-      idxData,
-      idxConv:   find(['plano_de_saude','plano_de_saude_','convenio']),
-      isNew:     false,
-    };
-  };
-  // mapa padrão (formato novo) — usado quando uma seção começa antes do cabeçalho
-  const DEFAULT_MAP = { idxNome:1, idxTel:2, idxStatus:0, idxFechou:-1, idxOrigem:3, idxData:5, idxConv:7, isNew:true };
-
-  let emFollow = false;  // dentro da seção "Follow - próximo mês"
-  for (const cells of grid) {
-    if (!cells.some(c => cellStr(c))) continue;           // linha vazia
-    /* seção "Follow - PRÓXIMO MÊS": os leads seguintes são o pipeline em
-       acompanhamento. Continuam CONTANDO como leads (total), mas são marcados
-       como "Follow" — não são conversão. Só o que muda é a etiqueta. */
-    if (norm(cells.map(c => cellStr(c)).join(' ')).includes('proximo_mes')) { emFollow = true; continue; }
-    if (isHeader(cells)) { map = buildMap(cells); continue; } // cabeçalho → atualiza mapa
-    const filled = cells.filter(c => cellStr(c)).length;
-    if (filled <= 1) continue;                            // título de seção (1 célula)
-
-    const m = map || DEFAULT_MAP;
-    const g = (i) => (i >= 0 && i < cells.length) ? cells[i] : '';
-    const nome   = cellStr(g(m.idxNome));
-    const origem = cellStr(g(m.idxOrigem));
-    const nn = norm(nome);
-    if (nn === 'nome' || nn === 'status') continue;       // cabeçalho repetido
-    if (/^(lead de |follow\s*-|proximo mes)/i.test(nome)) continue; // título caiu no nome
-    if (!nome && !origem) continue;
-
-    const rawStatus = m.isNew
-      ? cellStr(g(m.idxStatus))
-      : (m.idxFechou >= 0 ? cellStr(g(m.idxFechou)) : '');
-    let status = normCRMStatus(rawStatus, m.isNew);
-    /* na seção de follow, leads sem status são acompanhamento em andamento */
-    if (emFollow && status === 'Sem status') status = 'Follow';
-
-    result.push({
-      nome,
-      telefone: cellStr(g(m.idxTel)),
-      origem:   normCRMOrigem(origem),
-      status,
-      convenio: normCRMConvenio(g(m.idxConv)),
-      date:     parseCRMDate(g(m.idxData)),
-    });
-  }
-  return result;
 }
 
 /* Mês/aba selecionado no CRM ('todos' = carteira inteira).
@@ -2150,14 +1776,13 @@ function getCRMLeads() {
   const CONV = 'Agendamento concluído';
   const porChave = new Map();
   for (const l of CRM_RAW) {
-    const key = crmKey(l);
-    const prev = porChave.get(key);
-    if (!prev) { porChave.set(key, l); continue; }
+    const prev = porChave.get(l.k);
+    if (!prev) { porChave.set(l.k, l); continue; }
     const [velho, novo] = l.abaIdx > prev.abaIdx ? [prev, l] : [l, prev];
     const status   = velho.status === CONV ? CONV : novo.status;
     const convenio = novo.convenio || velho.convenio;
     const fonte    = novo.fonte === 'waseller' && velho.fonte !== 'waseller' ? 'abas+waseller' : novo.fonte;
-    porChave.set(key, status === novo.status && convenio === novo.convenio && fonte === novo.fonte
+    porChave.set(l.k, status === novo.status && convenio === novo.convenio && fonte === novo.fonte
       ? novo : { ...novo, status, convenio, fonte });
   }
   return [...porChave.values()];
@@ -2271,7 +1896,7 @@ function renderCRM() {
     ? `Das ${convCRM.length} conversões registradas no CRM, <strong>${convIndicacao} (${pctInd}%)</strong> vieram de indicação.`
     : '';
   /* backfill do Worker em andamento (primeiros ~25 min após o deploy) */
-  const notaSync = CRM_WASELLER?.sincronizando && leads.some(l => l.fonte === 'waseller')
+  const notaSync = CRM_RESPOSTA?.sincronizando && leads.some(l => l.fonte === 'waseller')
     ? 'Sincronizando o histórico do WaSeller — os números de setembro em diante ainda podem subir.'
     : '';
   document.getElementById('crmIndicacaoNote').innerHTML = [notaIndicacao, notaSync].filter(Boolean).join('<br>');
