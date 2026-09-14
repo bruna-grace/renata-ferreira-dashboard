@@ -1741,8 +1741,11 @@ function getFilteredDestaques(ignoreDate = false) {
       if (!from && !to) return true;
       if (!colData) return true;
       const d = row[colData];
-      const date = d instanceof Date ? d : toDate(d);
-      if (!date) return true;
+      const ini = d instanceof Date ? d : toDate(d);
+      if (!ini) return true;
+      /* Data = segunda-feira da semana; conta no mês da quinta (meio da semana),
+         a mesma regra dos canais — 31/08–06/09 é setembro */
+      const date = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate() + 3);
       if (from && date < from) return false;
       if (to   && date > to)   return false;
       return true;
@@ -1796,7 +1799,7 @@ function renderDestaques() {
               <span class="destaque-channel">${ch.name}</span>
             </div>
           </div>
-          <div class="destaque-nodata">Sem dados no período</div>
+          <div class="destaque-nodata">${allRows.some(r => matchesChannel(r, ch)) ? 'Sem dados no período' : 'Ainda não coletado'}</div>
           <div class="destaque-footer">
             <span class="destaque-period">—</span>
           </div>
