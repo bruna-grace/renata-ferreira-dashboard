@@ -1990,6 +1990,17 @@ function cruzamentoAds(abasEscopo, convMeses) {
     cpc: usados.length && consultas ? inv / consultas : null,
     fechado: base.length > 0 && base.every(m => m.conv.estado === 'fechado'),
     algumFechado: base.some(m => m.conv.estado === 'fechado'),
+    /* de onde vêm as consultas: todas da Renata, todas de prévia do CRM, ou misturado */
+    subConsultas: (() => {
+      if (!base.length) return '—';
+      const daRenata = base.filter(m => m.conv.informado != null).length;
+      const total = base.reduce((s, m) => s + m.conv.valor, 0);
+      if (daRenata === base.length)
+        return `${total} consultas informadas pela Renata` +
+               (base.every(m => m.conv.estado === 'fechado') ? '' : ' · mês em andamento');
+      if (daRenata) return `${total} consultas (Renata + prévia do CRM)`;
+      return `${total} conversões pelo CRM (prévia)`;
+    })(),
     parcial: usados.some(m => !crmMesAcabou(m.mes)),
     semInv: meses.filter(m => !(m.inv > 0)).map(m => crmMonthLabel(m.aba)),
     semCRM: mesesAds.filter(m => !meses.some(x => x.mes === m)),
@@ -2018,10 +2029,7 @@ function renderCRMInvestimento(abasEscopo, convMeses) {
     card(x.cpl != null ? fmtBRL(x.cpl) : '—', 'Custo por Lead',
          `${x.leadsPagos} leads de mídia paga (${ORIGENS_PAGAS.join(', ')})`) +
     card(x.cpc != null ? fmtBRL(x.cpc) + tag(x.fechado ? 'fechado' : 'prévia', x.fechado ? 'fechado' : 'previa') : '—',
-         'Custo por Consulta',
-         x.fechado ? `${x.consultas} consultas realizadas (Renata)`
-         : x.algumFechado ? `${x.consultas} consultas (Renata + prévia do CRM)`
-         : `${x.consultas} conversões pelo CRM (prévia)`);
+         'Custo por Consulta', x.subConsultas);
 
   const notas = [];
   if (x.semCRM.length) notas.push(x.semCRM.map(m => `${rotuloMes(m)}: ${fmtBRL(adsMeses[m].custo)} investidos`).join(', ') +
