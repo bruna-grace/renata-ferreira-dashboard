@@ -45,8 +45,16 @@ const FILTRO = `C starts with '{"name"' and not C contains '@g.us'` +
 
 /* ── Mapeamento etiqueta WaSeller → vocabulário do dashboard ──────────────
    Comparação sem acento e sem caixa. Etiquetas operacionais ("Não lidas",
-   "INCLUIR NO CRM - MENSAL", "CONTATOS 2026") e de região ("NOVO-SP",
-   "OUTRA CIDADE") não mexem em origem nem status. */
+   "INCLUIR NO CRM - MENSAL", "CONTATOS 2026"), de região ("NOVO-SP",
+   "OUTRA CIDADE") e de condição ("Paralisia", "Ortognática"...) não mexem em
+   origem nem status.
+
+   Funil padronizado em 08/10/2026 — as regras aceitam o nome ANTIGO e o NOVO
+   de cada etiqueta, então a renomeação no WaSeller pode acontecer a qualquer
+   hora sem o dashboard perder status nem conversão:
+     Flow 1        → Em atendimento        PACIENTES   → Paciente
+     1º CONSULTA   → 1ª consulta agendada  Acompanhar  → Follow-up
+     DESMARCOU C   → Desmarcou             (nova)      → Valor enviado */
 
 /* PRÉVIA de conversão = "1º CONSULTA" ou "agendamento concluído". A conversão
    oficial é o nº de consultas realizadas que a Renata informa (aba CONSULTAS,
@@ -63,7 +71,9 @@ const STATUS_REGRAS = [
   ['Desmarcou',             l => l.startsWith('desmarc')],
   ['Follow',                l => l === 'acompanhar' || l.startsWith('follow')],
   ['Paciente',              l => l === 'pacientes' || l === 'paciente'],
-  ['Atendimento iniciado',  l => l.startsWith('flow')],   // "Flow 1" = entrou na automação
+  ['Valor enviado',         l => l.startsWith('valor enviado')],
+  /* "Flow 1" (nome antigo) = entrou na automação de atendimento */
+  ['Atendimento iniciado',  l => l.startsWith('flow') || l.startsWith('em atendimento')],
 ];
 
 function origemDe(etiquetas) {
