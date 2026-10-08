@@ -2180,12 +2180,12 @@ function renderCRM() {
 
   /* ── Status ── */
   const statusColors = {
-    'Agendamento concluído':'#22c55e','Atendimento iniciado':'#14b8a6','Valor enviado':'#0ea5e9','Agendado':'#3b82f6','Follow':'#f59e0b',
+    'Agendamento concluído':'#22c55e','Atendimento iniciado':'#14b8a6','Valor enviado':'#0ea5e9','Valor social enviado':'#06b6d4','Agendado':'#3b82f6','Follow':'#f59e0b',
     'Aguardando retorno':'#eab308','Paciente':'#8b5cf6','Desmarcou':'#f97316',
     'Declinado':'#ef4444','Finalizado':'#a1a1aa','Nunca respondeu':'#78716c',
     'Não convertido':'#71717a','Sem status':'#52525b',
   };
-  const statusOrder = ['Agendamento concluído','Atendimento iniciado','Valor enviado','Agendado','Follow','Aguardando retorno','Paciente','Desmarcou','Declinado','Finalizado','Nunca respondeu','Não convertido','Sem status'];
+  const statusOrder = ['Agendamento concluído','Atendimento iniciado','Valor enviado','Valor social enviado','Agendado','Follow','Aguardando retorno','Paciente','Desmarcou','Declinado','Finalizado','Nunca respondeu','Não convertido','Sem status'];
   const statusCount = {};
   leads.forEach(l => { statusCount[l.status] = (statusCount[l.status]||0) + 1; });
   const statusSorted = statusOrder

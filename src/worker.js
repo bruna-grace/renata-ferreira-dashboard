@@ -64,6 +64,11 @@ const FILTRO = `C starts with '{"name"' and not C contains '@g.us'` +
    com "1º CONSULTA". Sem isso, setembro contaria conversões de meses passados. */
 const ehConversao = l => /^1.? ?consulta/.test(l) || (l.includes('agendamento') && l.includes('conclu'));
 
+/* "Valor social enviado" é etapa (sai quando o contato avança), mas quem recebeu
+   o valor social precisa continuar identificável depois de agendar — por isso
+   registrar() guarda isso no contato (c._.vs) e a API devolve valorSocial. */
+const ehValorSocial = l => l.startsWith('valor social');
+
 /* Demais status: a PRIMEIRA regra que bater vence (ordem = prioridade). */
 const STATUS_REGRAS = [
   ['Paciente',              ehConversao],   // já convertido em mês anterior
@@ -71,6 +76,7 @@ const STATUS_REGRAS = [
   ['Desmarcou',             l => l.startsWith('desmarc')],
   ['Follow',                l => l === 'acompanhar' || l.startsWith('follow')],
   ['Paciente',              l => l === 'pacientes' || l === 'paciente'],
+  ['Valor social enviado',  ehValorSocial],
   ['Valor enviado',         l => l.startsWith('valor enviado')],
   /* "Flow 1" (nome antigo) = entrou na automação de atendimento */
   ['Atendimento iniciado',  l => l.startsWith('flow') || l.startsWith('em atendimento')],
@@ -228,6 +234,7 @@ function registrar(estado, k, ts, etiquetas, novoUsuario, adicionadas) {
 
   const temConv = etiquetas.some(ehConversao);
   const meta = (c._ ||= { t: '', cv: null });
+  if (etiquetas.some(ehValorSocial)) meta.vs = true;
   let converteu = adicionadas.some(ehConversao);
   if (ts >= meta.t) {
     if (meta.cv === false && temConv) converteu = true;
@@ -298,6 +305,7 @@ function montarResposta(estado, planilha, ads) {
         data:   e.f.slice(0, 10),
         origem: origemDe(e.tags),
         status: statusDe(e.tags, e.cv),
+        valorSocial: !!meses._?.vs,   // já recebeu o valor social (em qualquer mês)
         convenio: null,
         fonte:  'waseller',
       });
