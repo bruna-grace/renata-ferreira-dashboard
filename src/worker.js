@@ -89,7 +89,9 @@ function origemDe(etiquetas) {
     if (l.includes('youtube'))   return 'YouTube';
     if (l.includes('instagram')) return 'Instagram';
     if (l.includes('google'))    return 'Google';
-    if (/\bsite\b/.test(l))      return 'Site';
+    /* "Site" e "Google" (busca, Maps, Google Meu Negócio) são etiquetas
+       separadas no WaSeller, mas no relatório contam juntas como Google. */
+    if (/\bsite\b/.test(l))      return 'Google';
     if (l.includes('indica') || l.includes('dr.') || l.includes('dra.')) return 'Indicação';
   }
   return 'Não informado';

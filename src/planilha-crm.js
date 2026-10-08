@@ -149,7 +149,7 @@ function normCRMOrigem(raw) {
   if (s.includes('google'))    return 'Google';
   if (s.includes('whatsapp') || s.startsWith('whats'))  return 'WhatsApp';
   if (s.includes('trafego') || s.includes('anuncio') || s.includes('ads')) return 'Tráfego';
-  if (s === 'site' || s.includes('site '))  return 'Site';
+  if (s === 'site' || s.includes('site '))  return 'Google';  // no relatório, site conta como Google
   if (s.includes('indicac') || s.includes('indicou') || s.includes('dr.') || s.includes('dra.')) return 'Indicação';
   if (!s || s === 'nao informado' || s === 'nao_informado') return 'Não informado';
   /* fallback: Title Case p/ não fragmentar por caixa ("TRÁFEGO" vs "Tráfego") */
