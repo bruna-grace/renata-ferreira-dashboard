@@ -64,10 +64,12 @@ const FILTRO = `C starts with '{"name"' and not C contains '@g.us'` +
    com "1º CONSULTA". Sem isso, setembro contaria conversões de meses passados. */
 const ehConversao = l => /^1.? ?consulta/.test(l) || (l.includes('agendamento') && l.includes('conclu'));
 
-/* "Valor social enviado" é etapa (sai quando o contato avança), mas quem recebeu
-   o valor social precisa continuar identificável depois de agendar — por isso
-   registrar() guarda isso no contato (c._.vs) e a API devolve valorSocial. */
+/* "Valor enviado" / "Valor social enviado" são etapas (saem quando o contato
+   avança), mas o dashboard compara quanto cada grupo agenda — então registrar()
+   guarda no contato qual valor ele recebeu (c._.vs / c._.vn) e a API devolve
+   valor: 'social' | 'normal'. Quem recebeu os dois conta como social. */
 const ehValorSocial = l => l.startsWith('valor social');
+const ehValorNormal = l => l.startsWith('valor enviado');
 
 /* Demais status: a PRIMEIRA regra que bater vence (ordem = prioridade). */
 const STATUS_REGRAS = [
@@ -77,7 +79,7 @@ const STATUS_REGRAS = [
   ['Follow',                l => l === 'acompanhar' || l.startsWith('follow')],
   ['Paciente',              l => l === 'pacientes' || l === 'paciente'],
   ['Valor social enviado',  ehValorSocial],
-  ['Valor enviado',         l => l.startsWith('valor enviado')],
+  ['Valor enviado',         ehValorNormal],
   /* "Flow 1" (nome antigo) = entrou na automação de atendimento */
   ['Atendimento iniciado',  l => l.startsWith('flow') || l.startsWith('em atendimento')],
 ];
@@ -235,6 +237,7 @@ function registrar(estado, k, ts, etiquetas, novoUsuario, adicionadas) {
   const temConv = etiquetas.some(ehConversao);
   const meta = (c._ ||= { t: '', cv: null });
   if (etiquetas.some(ehValorSocial)) meta.vs = true;
+  if (etiquetas.some(ehValorNormal)) meta.vn = true;
   let converteu = adicionadas.some(ehConversao);
   if (ts >= meta.t) {
     if (meta.cv === false && temConv) converteu = true;
@@ -305,7 +308,7 @@ function montarResposta(estado, planilha, ads) {
         data:   e.f.slice(0, 10),
         origem: origemDe(e.tags),
         status: statusDe(e.tags, e.cv),
-        valorSocial: !!meses._?.vs,   // já recebeu o valor social (em qualquer mês)
+        valor:  meses._?.vs ? 'social' : meses._?.vn ? 'normal' : null,  // valor que já recebeu (qualquer mês)
         convenio: null,
         fonte:  'waseller',
       });

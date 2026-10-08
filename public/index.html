@@ -745,6 +745,9 @@
       <div class="crm-sub-label">Investimento em Ads × CRM</div>
       <div class="crm-kpi-grid tres" id="crmAdsKpis"></div>
       <div class="crm-note" id="crmAdsNote"></div>
+      <div class="crm-sub-label">Valor social × valor normal</div>
+      <div class="crm-kpi-grid tres" id="crmValorKpis"></div>
+      <div class="crm-note" id="crmValorNote"></div>
       <div class="crm-charts-grid">
         <div class="chart-card">
           <div class="chart-title">Origem dos Leads</div>
@@ -2051,6 +2054,46 @@ function renderCRMVazio() {
   ['crmOrigemBars', 'crmStatusBars', 'crmConvenioBars'].forEach(id =>
     document.getElementById(id).innerHTML = '<div class="crm-empty">Sem dados no período</div>');
   renderCRMInvestimento([], []);
+  renderCRMValor([]);
+}
+
+/* ── Valor social × valor normal ──
+   O Worker marca no contato qual valor ele recebeu (etiquetas "Valor enviado" /
+   "Valor social enviado", que existem desde 08/10/2026); a marca fica mesmo
+   depois que a etiqueta de etapa é trocada. Agendou = 1ª consulta agendada no
+   período ou já paciente. Quem recebeu os dois valores conta como social. */
+const VALOR_DESDE = '08/10/2026';
+function renderCRMValor(leads) {
+  const AGENDOU = ['Agendamento concluído', 'Paciente'];
+  const grupo = v => {
+    const g = leads.filter(l => l.valor === v);
+    const ag = g.filter(l => AGENDOU.includes(l.status)).length;
+    return { n: g.length, ag, taxa: g.length ? Math.round(ag / g.length * 100) : null };
+  };
+  const social = grupo('social'), normal = grupo('normal');
+  const kpis = document.getElementById('crmValorKpis');
+  const nota = document.getElementById('crmValorNote');
+  if (!social.n && !normal.n) {
+    kpis.innerHTML = `<div class="crm-kpi" style="grid-column:1/-1"><div class="crm-kpi-sub">Nenhum contato com etiqueta de valor no período. A contagem começa em ${VALOR_DESDE}.</div></div>`;
+    nota.innerHTML = '';
+    return;
+  }
+  const card = (g, label) => `
+    <div class="crm-kpi">
+      <div class="crm-kpi-val">${g.taxa == null ? '—' : g.taxa + '%'}</div>
+      <div class="crm-kpi-label">Agendaram · ${label}</div>
+      <div class="crm-kpi-sub">${g.n ? `${g.ag} de ${g.n} que receberam o ${label}` : `ninguém recebeu o ${label} no período`}</div>
+    </div>`;
+  const enviados = social.n + normal.n;
+  kpis.innerHTML = card(social, 'valor social') + card(normal, 'valor normal') + `
+    <div class="crm-kpi">
+      <div class="crm-kpi-val">${Math.round(social.n / enviados * 100)}%</div>
+      <div class="crm-kpi-label">Receberam o Valor Social</div>
+      <div class="crm-kpi-sub">${social.n} de ${enviados} contatos que receberam valor</div>
+    </div>`;
+  const poucos = Math.min(social.n, normal.n) < 10
+    ? ' Ainda são poucos casos: a diferença entre os grupos pode mudar bastante.' : '';
+  nota.innerHTML = `Contado desde ${VALOR_DESDE}, quando as etiquetas de valor passaram a existir.${poucos}`;
 }
 
 function renderCRM() {
@@ -2156,6 +2199,7 @@ function renderCRM() {
     : '';
   document.getElementById('crmIndicacaoNote').innerHTML = [notaIndicacao, notaSync].filter(Boolean).join('<br>');
   renderCRMInvestimento(abasEscopo, convMeses);
+  renderCRMValor(leads);
 
   /* ── Origem ── */
   const origemColors = {
