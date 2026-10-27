@@ -192,14 +192,30 @@ async function sincronizarLoteWaSeller(env) {
     const k = chaves.get(m[1]);
     if (!k) continue;
 
-    const etiquetas = nomesEtiquetas(p.labels).filter(l => l && l !== 'nao lidas');
     const novoUsuario = cru.includes('"NewUser"');
-    /* evento "labels"/"add" diz exatamente quais etiquetas entraram agora */
-    let adicionadas = [];
+    /* evento "labels" diz exatamente quais etiquetas entraram ("add") ou
+       saíram ("remove") agora */
+    let adicionadas = [], removidas = [];
     if (p.eventID === 'labels') {
       const det = lerPayloadCompleto(cru)?.eventDetails;
-      if (det?.type === 'add') adicionadas = nomesEtiquetas(det.labels);
+      if (det?.type === 'add')    adicionadas = nomesEtiquetas(det.labels);
+      if (det?.type === 'remove') removidas   = nomesEtiquetas(det.labels);
     }
+
+    /* Até 20/10/2026 todo evento trazia em `labels` as etiquetas atuais do
+       contato. Desde 27/10 (extensão atualizada) o campo não vem mais: parte
+       das últimas etiquetas conhecidas e aplica o que entrou/saiu. Lista vazia
+       (`labels: []`) continua valendo "sem etiqueta" — só a AUSÊNCIA muda. */
+    let etiquetas;
+    if (Array.isArray(p.labels)) {
+      etiquetas = nomesEtiquetas(p.labels);
+    } else {
+      const atuais = new Set(etiquetasAtuais(estado.contatos[k]));
+      adicionadas.forEach(l => atuais.add(l));
+      removidas.forEach(l => atuais.delete(l));
+      etiquetas = [...atuais];
+    }
+    etiquetas = etiquetas.filter(l => l && l !== 'nao lidas');
 
     registrar(estado, k, ts, etiquetas, novoUsuario, adicionadas);
   }
@@ -254,6 +270,16 @@ function registrar(estado, k, ts, etiquetas, novoUsuario, adicionadas) {
   if (ts > e.ts || (ts === e.ts && JSON.stringify(etiquetas) > JSON.stringify(e.tags))) {
     e.ts = ts; e.tags = etiquetas;
   }
+}
+
+/* Etiquetas do último evento visto do contato = as do mês mais recente
+   (cada mês guarda as do seu último evento). */
+function etiquetasAtuais(c) {
+  let ultimo = null;
+  for (const [mes, e] of Object.entries(c || {})) {
+    if (mes !== '_' && (!ultimo || e.ts > ultimo.ts)) ultimo = e;
+  }
+  return ultimo?.tags || [];
 }
 
 /* Só o começo do payload interessa (name, labels, number). Corta antes de
